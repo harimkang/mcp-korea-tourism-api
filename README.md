@@ -1,6 +1,17 @@
 # Korea Tourism API MCP Server ✈️
 
+<!-- Badges -->
+[![PyPI version](https://badge.fury.io/py/mcp-korea-tourism-api.svg)](https://badge.fury.io/py/mcp-korea-tourism-api)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI Tests](https://github.com/harimkang/mcp-korea-tourism-api/actions/workflows/ci.yml/badge.svg)](https://github.com/harimkang/mcp-korea-tourism-api/actions/workflows/ci.yml)
+
 Unlock the wonders of South Korean tourism directly within your AI assistant! This project provides a Model Context Protocol (MCP) server powered by the official Korea Tourism Organization (KTO) API. Equip your AI with the ability to discover vibrant festivals, serene temples, delicious restaurants, comfortable accommodations, and much more across Korea.
+
+**Links:**
+*   **PyPI Package:** [https://pypi.org/project/mcp-korea-tourism-api/](https://pypi.org/project/mcp-korea-tourism-api/)
+*   **GitHub Repository:** [https://github.com/harimkang/mcp-korea-tourism-api](https://github.com/harimkang/mcp-korea-tourism-api)
+*   **Releases:** [https://github.com/harimkang/mcp-korea-tourism-api/releases](https://github.com/harimkang/mcp-korea-tourism-api/releases)
+
 
 ## ✨ Features
 
