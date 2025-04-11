@@ -282,7 +282,7 @@ class KoreaTourismApiClient:
                 ]
             }
         """
-        params = {
+        params: Dict[str, Any] = {
             "keyword": keyword,  # Required by the API
             "arrange": "Q",  # Sort by {A: alphabetically, C: modified date, D: created date, O: alphabetically with image, Q: modified date with image, R: created date with image}
             "listYN": "Y",   # Return as a list
@@ -308,7 +308,7 @@ class KoreaTourismApiClient:
         
         # If a specific language is requested, create a new client with that language
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.SEARCH_KEYWORD_ENDPOINT, params)
         
         # Otherwise use the current client's language
@@ -371,7 +371,7 @@ class KoreaTourismApiClient:
                 ]
             }
         """
-        params = {
+        params: Dict[str, Any] = {
             "arrange": "Q",  # Sort by {A: alphabetically, C: modified date, D: created date, O: alphabetically with image, Q: modified date with image, R: created date with image}
             "listYN": "Y",   # Return as a list
             "pageNo": str(page),
@@ -400,7 +400,7 @@ class KoreaTourismApiClient:
         
         # If a specific language is requested, create a new client with that language
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.AREA_BASED_LIST_ENDPOINT, params)
             
         # Otherwise use the current client's language
@@ -411,7 +411,7 @@ class KoreaTourismApiClient:
         mapx: float,
         mapy: float,
         radius: int,
-        content_type_id: str,
+        content_type_id: Optional[str] = None,
         language: Optional[str] = None,
         page: int = 1,
         rows: int = 20,
@@ -460,7 +460,7 @@ class KoreaTourismApiClient:
                 ]
             }
         """
-        params = {
+        params: Dict[str, Any] = {
             "listYN": "Y",   # Return as a list
             "pageNo": str(page),
             "numOfRows": str(rows),
@@ -475,7 +475,7 @@ class KoreaTourismApiClient:
         
         # If a specific language is requested, create a new client with that language
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.LOCATION_BASED_LIST_ENDPOINT, params)
         
         # Otherwise use the current client's language
@@ -534,7 +534,7 @@ class KoreaTourismApiClient:
                 ]
             }
         """
-        params = {
+        params: Dict[str, Any] = {
             "eventStartDate": event_start_date,
             "pageNo": str(page),
             "numOfRows": str(rows),
@@ -551,7 +551,7 @@ class KoreaTourismApiClient:
 
         # If a specific language is requested, create a new client with that language
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.SEARCH_FESTIVAL_ENDPOINT, params)
         
         # Otherwise use the current client's language
@@ -608,7 +608,7 @@ class KoreaTourismApiClient:
                 ]
             }
         """
-        params = {
+        params: Dict[str, Any] = {
             "pageNo": str(page),
             "numOfRows": str(rows),
         }
@@ -621,7 +621,7 @@ class KoreaTourismApiClient:
 
         # If a specific language is requested, create a new client with that language
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.SEARCH_STAY_ENDPOINT, params)
         
         # Otherwise use the current client's language
@@ -699,7 +699,7 @@ class KoreaTourismApiClient:
             }
         """
             
-        params = {
+        params: Dict[str, Any] = {
             "contentId": content_id,
             "defaultYN": default_yn,
             "firstImageYN": first_image_yn,
@@ -718,7 +718,7 @@ class KoreaTourismApiClient:
 
         # If a specific language is requested, create a new client with that language
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.DETAIL_COMMON_ENDPOINT, params)
             
         # Otherwise use the current client's language
@@ -763,7 +763,7 @@ class KoreaTourismApiClient:
                 ]
             }
         """
-        params = {
+        params: Dict[str, Any] = {
             "contentId": content_id,
             "imageYN": image_yn,
             "subImageYN": sub_image_yn,
@@ -774,7 +774,7 @@ class KoreaTourismApiClient:
         
         # If a specific language is requested, create a new client with that language
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.DETAIL_IMAGE_ENDPOINT, params)
             
         # Otherwise use the current client's language
@@ -847,7 +847,7 @@ class KoreaTourismApiClient:
             
             Note: The actual fields returned depend on the content_type_id and will vary between different types of tourism items.
         """
-        params = {
+        params: Dict[str, Any] = {
             "contentId": content_id,
             "contentTypeId": content_type_id,
             "numOfRows": str(rows),
@@ -856,7 +856,7 @@ class KoreaTourismApiClient:
 
         # If a specific language is requested, create a new client with that language
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.DETAIL_INTRO_ENDPOINT, params)
             
         # Otherwise use the current client's language
@@ -901,7 +901,7 @@ class KoreaTourismApiClient:
             
             Note: Each item in the 'items' list represents a specific piece of additional information about the tourism item.
         """
-        params = {
+        params: Dict[str, Any] = {
             "contentId": content_id,
             "contentTypeId": content_type_id,
             "numOfRows": str(rows),
@@ -910,7 +910,7 @@ class KoreaTourismApiClient:
 
         # If a specific language is requested, create a new client with that language
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.DETAIL_INFO_ENDPOINT, params)
         
         # Otherwise use the current client's language
@@ -976,7 +976,7 @@ class KoreaTourismApiClient:
                 ]
             }
         """
-        params = {
+        params: Dict[str, Any] = {
             "numOfRows": rows,
             "pageNo": page,
             "listYN": "Y",
@@ -1004,7 +1004,7 @@ class KoreaTourismApiClient:
             params["contentTypeId"] = content_type_id
         
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.AREA_BASED_SYNC_LIST_ENDPOINT, params)
             
         return await self._make_request(self.AREA_BASED_SYNC_LIST_ENDPOINT, params)
@@ -1044,7 +1044,7 @@ class KoreaTourismApiClient:
             If area_code is provided, returns sigungu codes for that area.
             If area_code is not provided, returns top-level area codes.
         """
-        params = {
+        params: Dict[str, Any] = {
             "numOfRows": rows,
             "pageNo": page,
         }
@@ -1052,7 +1052,7 @@ class KoreaTourismApiClient:
             params["areaCode"] = area_code
 
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.AREA_CODE_LIST_ENDPOINT, params)
             
         return await self._make_request(self.AREA_CODE_LIST_ENDPOINT, params)
@@ -1100,7 +1100,7 @@ class KoreaTourismApiClient:
             - With cat1: Returns subcategories (cat2) under that cat1
             - With cat1 and cat2: Returns subcategories (cat3) under that cat2
         """
-        params = {
+        params: Dict[str, Any] = {
             "numOfRows": rows,
             "pageNo": page,
         }
@@ -1117,7 +1117,7 @@ class KoreaTourismApiClient:
                 if cat3:
                     params["cat3"] = cat3
         if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(language=language)
+            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
             return await temp_client._make_request(self.CATEGORY_CODE_LIST_ENDPOINT, params)
             
         return await self._make_request(self.CATEGORY_CODE_LIST_ENDPOINT, params)

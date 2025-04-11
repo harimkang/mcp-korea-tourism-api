@@ -5,10 +5,17 @@ from mcp.server.fastmcp import FastMCP
 from mcp_tourism.api_client import KoreaTourismApiClient, CONTENTTYPE_ID_MAP
 
 # Create an MCP server
-mcp = FastMCP("Korea Tourism API")
+mcp = FastMCP(
+    name="Korea Tourism API",
+    description="API for Korea Tourism information",
+    version="0.1",
+    dependencies=["httpx", "cachetools", "tenacity", "ratelimit"],
+)
 
 # Initialize the API client
 api_key = os.environ.get("KOREA_TOURISM_API_KEY")
+if not api_key:
+    raise ValueError("KOREA_TOURISM_API_KEY environment variable is not set")
 client = KoreaTourismApiClient(api_key=api_key)
 
 # MCP Tools for Korea Tourism API
@@ -27,7 +34,7 @@ async def search_tourism_by_keyword(
         keyword: Search keyword (e.g., "Gyeongbokgung", "Hanok", "Bibimbap")
         content_type: Type of content to search for (e.g., "Tourist Attraction", "Restaurant", "Festival Event")
         area_code: Area code to filter results (e.g., "1" for Seoul)
-        language: Language for results (e.g., "en", "jp", "zh-cn")
+        language: Language for results (e.g., "en", "jp", "zh-cn"), default is "en"
         
     Returns:
         A dictionary containing search results with tourism information.
@@ -246,7 +253,7 @@ async def get_detailed_information(
     )
     
     # Get intro details if content_type_id is provided
-    intro_details = {}
+    intro_details: Dict[str, Any] = {}
     if content_type_id:
         intro_result = await client.get_detail_intro(
             content_id=content_id,
@@ -256,7 +263,7 @@ async def get_detailed_information(
         intro_details = intro_result.get("items", [{}])[0] if intro_result.get("items") else {}
     
     # Get additional details
-    additional_details = {}
+    additional_details: Dict[str, Any] = {}
     if content_type_id:
         additional_result = await client.get_detail_info(
             content_id=content_id,
@@ -326,7 +333,3 @@ async def get_area_codes(
         "items": results.get("items", []),
         "parent_area_code": parent_area_code
     }
-
-# Run the server
-if __name__ == "__main__":
-    mcp.run(host="0.0.0.0", port=8000)
