@@ -31,16 +31,18 @@ jobs:
     - name: Build package
       run: python -m build
 
-    - name: Publish package to PyPI
-      # This uses the token stored in GitHub Secrets
-      uses: pypa/gh-action-pypi-publish@v1.8.14
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
+    - name: Publish package to PyPI using twine directly
+      # Run twine upload directly using the installed twine version
+      # This uses the token stored in GitHub Secrets via environment variables
+      run: >-
+        twine upload dist/*
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
 
     - name: Publish package to GitHub Packages
-      # Run only if PyPI publish succeeded
-      if: success()
+      # Run only if PyPI publish succeeded (or previous step succeeded)
+      if: success() # Check if the twine upload step succeeded
       run: >-
         twine upload
         --repository-url https://pypi.pkg.github.com/${{ github.repository_owner }}/
@@ -52,9 +54,9 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Create GitHub Release
-      # Run only if PyPI publish succeeded
+      # Run only if PyPI/twine upload succeeded
       uses: softprops/action-gh-release@v2.0.9
-      if: success()
+      if: success() # Check if the twine upload step succeeded
       with:
         # Creates release based on the tag name (e.g., v0.1.0)
         # You can customize the release name and body if needed
