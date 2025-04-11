@@ -1,0 +1,65 @@
+name: Publish Python Package
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Trigger on version tags like v0.1.0
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed for PyPI trusted publishing or token upload
+      id-token: write
+      # Needed to create Releases
+      contents: write
+      # Needed to publish to GitHub Packages
+      packages: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12' # Match project's Python version
+
+    - name: Install build dependencies
+      run: pip install build twine
+
+    - name: Build package
+      run: python -m build
+
+    - name: Publish package to PyPI
+      # This uses the token stored in GitHub Secrets
+      uses: pypa/gh-action-pypi-publish@v1.8.14
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
+
+    - name: Publish package to GitHub Packages
+      # Run only if PyPI publish succeeded
+      if: success()
+      run: >-
+        twine upload
+        --repository-url https://pypi.pkg.github.com/${{ github.repository_owner }}/
+        --user ${{ github.actor }}
+        --password ${{ secrets.GITHUB_TOKEN }}
+        dist/*
+      env:
+        TWINE_USERNAME: ${{ github.actor }}
+        TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create GitHub Release
+      # Run only if PyPI publish succeeded
+      uses: softprops/action-gh-release@v2.0.9
+      if: success()
+      with:
+        # Creates release based on the tag name (e.g., v0.1.0)
+        # You can customize the release name and body if needed
+        # name: Release ${{ github.ref_name }}
+        # body: See CHANGELOG.md for details.
+        files: dist/* # Uploads the .whl and .tar.gz files as assets
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Uses the default GitHub token 
