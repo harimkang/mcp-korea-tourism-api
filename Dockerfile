@@ -39,5 +39,5 @@ RUN uv pip install . --no-deps --system
 # EXPOSE 8000
 
 # Command to run the application
-# Python can now find the module thanks to the install step above
-CMD ["uv", "run", "-m", "mcp_tourism.server"] 
+# Use python -m directly instead of uv run to avoid creating a virtual env at runtime
+CMD ["python", "-m", "mcp_tourism.server"] 

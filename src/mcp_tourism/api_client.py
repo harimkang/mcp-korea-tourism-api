@@ -88,26 +88,54 @@ class KoreaTourismApiClient:
         Initialize with optional language configuration.
         
         Args:
-            language: Language code for content (en, ko, jp, zh, zh-cn, zh-tw, de, fr, es, ru)
+            language: Language code for content (en, ko, jp, zh-cn, zh-tw, de, fr, es, ru)
         """
         self.api_key = api_key
         if not self.api_key:
             raise ValueError("Korean Tourism API key must be provided in settings")
             
-        self.logger = logging.getLogger("tourism_api_client")
+        # Initialize logger as a simple attribute to avoid heavy logger setup at init time
+        self._logger_name = "tourism_api_client"
             
         # Set language service
         self.language = language.lower()
+        self.service_name = None
+        self.full_base_url = None
+        
+        # Lazy initialization will happen at first request
+        self._is_fully_initialized = False
+        
+        # Cache will be initialized on first use
+        self._cache = None
+        
+    def _ensure_full_initialization(self):
+        """Ensure all initialization tasks are completed before first API request"""
+        if self._is_fully_initialized:
+            return
+            
+        # Get logger
+        import logging
+        self.logger = logging.getLogger(self._logger_name)
+        
+        # Initialize language service
         if self.language not in LANGUAGE_SERVICE_MAP:
-            self.logger.warning(f"Unsupported language: {language}. Falling back to English.")
+            self.logger.warning(f"Unsupported language: {self.language}. Falling back to English.")
             self.language = "en"
             
         self.service_name = LANGUAGE_SERVICE_MAP[self.language]
         self.full_base_url = f"{self.BASE_URL}/{self.service_name}"
         
-        # Cache setup - Cache responses for 24 hours by default
-        self.cache = TTLCache(maxsize=1000, ttl=86400)  
+        # Initialize cache
+        self._cache = TTLCache(maxsize=1000, ttl=86400)  # Cache responses for 24 hours by default
         
+        self._is_fully_initialized = True
+        
+    @property
+    def cache(self):
+        """Lazy cache initialization"""
+        self._ensure_full_initialization()
+        return self._cache
+    
     @classmethod
     async def get_shared_client(cls) -> httpx.AsyncClient:
         """Get or create the shared HTTP client with connection pooling"""
@@ -168,6 +196,9 @@ class KoreaTourismApiClient:
     )
     async def _make_request(self, endpoint: str, params: Dict[str, Any], use_cache: bool = True) -> Dict[str, Any]:
         """Make a request to the API with caching and rate limiting"""
+        # Ensure all initialization is completed
+        self._ensure_full_initialization()
+        
         # Check cache first if caching is enabled
         if use_cache:
             cache_key = self._get_cache_key(endpoint, params)
