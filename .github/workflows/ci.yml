@@ -34,8 +34,14 @@ jobs:
       # Installs main dependencies and those listed under [project.optional-dependencies.dev]
       run: uv sync --dev --all-extras
 
+    # --- Add this step to install the project itself ---
+    - name: Install project in editable mode
+      # This makes the 'mcp_tourism' package importable from the src directory
+      run: uv pip install -e .
+
     # --- 1. Unit Tests ---
-    - name: Run Unit Tests with pytest
+    - name: Run Unit Tests with pytest via uv
+      # Run pytest using uv run to ensure correct environment context
       # This step will fail if any unit test fails, stopping the workflow here
       run: uv run pytest tests/
 
