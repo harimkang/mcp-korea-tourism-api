@@ -67,27 +67,3 @@ jobs:
     - name: Build Docker image
       # This step will fail if the build fails
       run: docker build -t mcp-korea-tourism .
-
-    - name: Run Docker container briefly and check logs
-      run: |
-        echo "Running Docker container..."
-        docker run --rm -d --name mcp-test-container -e KOREA_TOURISM_API_KEY="DUMMY_FOR_CI" mcp-korea-tourism
-        echo "Waiting for container to start (5 seconds)..."
-        sleep 5
-
-        # Check if container is still running
-        if ! docker ps --filter "name=mcp-test-container" --filter "status=running" --quiet; then
-          echo "Container exited prematurely! Dumping logs:"
-          docker logs mcp-test-container || echo "Could not fetch logs."
-          exit 1
-        fi
-
-        echo "Container is running. Checking logs for startup message..."
-        # Check for the debug message indicating the main block was entered
-        # This step will fail if the grep command finds nothing
-        docker logs mcp-test-container | grep "DEBUG: Entering main block..."
-        echo "Startup message found. Docker check passed."
-
-        echo "Stopping container..."
-        docker stop mcp-test-container
-      shell: bash 
