@@ -1,9 +1,24 @@
 [project]
 name = "mcp-korea-tourism"
 version = "0.1.0"
+authors = [
+    { name = "Harim Kang", email = "harimkang4422@gmail.com" },
+]
 description = "MCP Server for Korea Tourism API"
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 4 - Beta", # 또는 3 - Alpha, 5 - Production/Stable
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
 dependencies = [
     "cachetools>=5.5.2",
     "httpx>=0.28.1",
@@ -11,6 +26,9 @@ dependencies = [
     "ratelimit>=2.2.1",
     "tenacity>=9.1.2",
 ]
+
+[project.urls]
+Repository = "https://github.com/harimkang/mcp-korea-tourism-api"
 
 [dependency-groups]
 dev = [

@@ -24,15 +24,16 @@ Before you begin, you **must** obtain an API key from the **Korea Tourism Organi
 2.  Register and request an API key for the "TourAPI" services (you might need to look for services providing information like `areaBasedList`, `searchKeyword`, `detailCommon`, etc.).
 3.  Keep your **Service Key (API Key)** safe. It will be required during installation or runtime.
 
-You need to apply for the API below to make a request for each language.
-    - English: https://www.data.go.kr/data/15101753/openapi.do
-    - Japanese: https://www.data.go.kr/data/15101760/openapi.do
-    - Simplified Chinese: https://www.data.go.kr/data/15101764/openapi.do
-    - Traditional Chinese: https://www.data.go.kr/data/15101769/openapi.do
-    - Russian: https://www.data.go.kr/data/15101831/openapi.do
-    - Spanese: https://www.data.go.kr/data/15101811/openapi.do
-    - German: https://www.data.go.kr/data/15101805/openapi.do
-    - French: https://www.data.go.kr/data/15101808/openapi.do
+
+> You need to apply for the API below to make a request for each language.
+> * English: https://www.data.go.kr/data/15101753/openapi.do
+> * Japanese: https://www.data.go.kr/data/15101760/openapi.do
+> * Simplified Chinese: https://www.data.go.kr/data/15101764/openapi.do
+> * Traditional Chinese: https://www.data.go.kr/data/15101769/openapi.do
+> * Russian: https://www.data.go.kr/data/15101831/openapi.do
+> * Spanese: https://www.data.go.kr/data/15101811/openapi.do
+> * German: https://www.data.go.kr/data/15101805/openapi.do
+> * French: https://www.data.go.kr/data/15101808/openapi.do
 
 
 ## 🚀 Installation & Running

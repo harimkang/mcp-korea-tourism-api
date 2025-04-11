@@ -32,7 +32,7 @@ jobs:
 
     - name: Install Python dependencies including dev group
       # Installs main dependencies and those listed under [project.optional-dependencies.dev]
-      run: uv sync -E dev
+      run: uv sync --dev --all-extras
 
     # --- 1. Unit Tests ---
     - name: Run Unit Tests with pytest
