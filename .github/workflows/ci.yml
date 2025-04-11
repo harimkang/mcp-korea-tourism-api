@@ -37,7 +37,7 @@ jobs:
     # --- 1. Unit Tests ---
     - name: Run Unit Tests with pytest
       # This step will fail if any unit test fails, stopping the workflow here
-      run: pytest tests/
+      run: python -m pytest tests/
 
     # --- 2. uv Run Test ---
     # This step only runs if unit tests passed
