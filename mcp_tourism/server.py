@@ -328,13 +328,8 @@ async def get_area_codes(
         "parent_area_code": parent_area_code
     }
 
-
 if __name__ == "__main__":
-    from argparse import ArgumentParser
-    from typing import Literal
-
-    parser = ArgumentParser()
-    parser.add_argument("--transport", type=Literal["stdio", "sse"], default="stdio")
-    args = parser.parse_args()
-
-    mcp.run(transport=args.transport)
+    try:
+        mcp.run(transport="stdio")
+    except Exception as e:
+        print(f"Error during mcp.run: {e}")
