@@ -215,10 +215,48 @@ class KoreaTourismApiClient:
                     self.logger.error("Empty response received from tourism API")
                     raise TourismApiError("Empty response received from tourism API")
                 
-                return response.json()
+                result = response.json()
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to parse JSON response: {e}. Response content: {response.text[:200]}")
                 raise TourismApiError(f"Invalid JSON response: {str(e)}")
+            
+            # Extract the items from the nested response structure
+            try:
+                response_header = result["response"]["header"]
+                response_body = result["response"]["body"]
+                
+                result_code = response_header.get("resultCode")
+                if result_code != "0000":
+                    raise TourismApiError(f"API error: {response_header.get('resultMsg', 'Unknown error')}")
+                
+                total_count = response_body.get("totalCount", 0)
+                items = []
+                
+                if total_count > 0:
+                    items_container = response_body.get("items", {})
+                    if "item" in items_container:
+                        items = items_container["item"]
+                        if not isinstance(items, list):
+                            items = [items]  # Ensure items is a list even if there's only one result
+                
+                # Structure the results
+                result_data = {
+                    "total_count": total_count,
+                    "num_of_rows": response_body.get("numOfRows", 0),
+                    "page_no": response_body.get("pageNo", 1),
+                    "items": items
+                }
+                
+                # Cache the response if caching is enabled
+                if use_cache:
+                    cache_key = self._get_cache_key(endpoint, params)
+                    self.cache[cache_key] = result_data
+                
+                return result_data
+                
+            except (KeyError, TypeError) as e:
+                self.logger.error(f"Error parsing Tourism API response: {e}")
+                raise TourismApiError(f"Failed to parse API response: {e}")
 
     
     async def search_by_keyword(
@@ -1121,3 +1159,16 @@ class KoreaTourismApiClient:
             return await temp_client._make_request(self.CATEGORY_CODE_LIST_ENDPOINT, params)
             
         return await self._make_request(self.CATEGORY_CODE_LIST_ENDPOINT, params)
+
+
+
+
+if __name__ == "__main__":
+    import os
+    import asyncio
+
+    api_key = os.environ.get("KOREA_TOURISM_API_KEY")
+    if not api_key:
+        raise ValueError("KOREA_TOURISM_API_KEY environment variable is not set")
+    client = KoreaTourismApiClient(api_key=api_key)
+    print(asyncio.run(client.search_by_keyword(keyword="Gyeongbokgung")))

@@ -1,6 +1,6 @@
 # server.py
 import os
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from mcp.server.fastmcp import FastMCP
 from mcp_tourism.api_client import KoreaTourismApiClient, CONTENTTYPE_ID_MAP
 
@@ -23,9 +23,9 @@ client = KoreaTourismApiClient(api_key=api_key)
 @mcp.tool()
 async def search_tourism_by_keyword(
     keyword: str,
-    content_type: Optional[str] = None,
-    area_code: Optional[str] = None,
-    language: Optional[str] = None,
+    content_type: str = None,
+    area_code: str = None,
+    language: str = None,
 ) -> Dict[str, Any]:
     """
     Search for tourism information in Korea by keyword.
@@ -48,26 +48,20 @@ async def search_tourism_by_keyword(
         )
     
     # Call the API client
-    results = await client.search_by_keyword(
+    return await client.search_by_keyword(
         keyword=keyword,
         content_type_id=content_type_id,
         area_code=area_code,
         language=language
     )
-    
-    return {
-        "total_count": results.get("total_count", 0),
-        "items": results.get("items", []),
-        "page_no": results.get("page_no", 1),
-        "num_of_rows": results.get("num_of_rows", 0)
-    }
+
 
 @mcp.tool()
 async def get_tourism_by_area(
     area_code: str,
-    sigungu_code: Optional[str] = None,
-    content_type: Optional[str] = None,
-    language: Optional[str] = None,
+    sigungu_code: str = None,
+    content_type: str = None,
+    language: str = None,
 ) -> Dict[str, Any]:
     """
     Browse tourism information by geographic areas in Korea.
@@ -109,8 +103,8 @@ async def find_nearby_attractions(
     longitude: float,
     latitude: float,
     radius: int = 1000,
-    content_type: Optional[str] = None,
-    language: Optional[str] = None,
+    content_type: str = None,
+    language: str = None,
 ) -> Dict[str, Any]:
     """
     Find tourism attractions near a specific location in Korea.
@@ -153,9 +147,9 @@ async def find_nearby_attractions(
 @mcp.tool()
 async def search_festivals_by_date(
     start_date: str,
-    end_date: Optional[str] = None,
-    area_code: Optional[str] = None,
-    language: Optional[str] = None,
+    end_date: str = None,
+    area_code: str = None,
+    language: str = None,
 ) -> Dict[str, Any]:
     """
     Find festivals in Korea by date range.
@@ -188,9 +182,9 @@ async def search_festivals_by_date(
 
 @mcp.tool()
 async def find_accommodations(
-    area_code: Optional[str] = None,
-    sigungu_code: Optional[str] = None,
-    language: Optional[str] = None,
+    area_code: str = None,
+    sigungu_code: str = None,
+    language: str = None,
 ) -> Dict[str, Any]:
     """
     Find accommodations in Korea by area.
@@ -220,8 +214,8 @@ async def find_accommodations(
 @mcp.tool()
 async def get_detailed_information(
     content_id: str,
-    content_type: Optional[str] = None,
-    language: Optional[str] = None,
+    content_type: str = None,
+    language: str = None,
 ) -> Dict[str, Any]:
     """
     Get detailed information about a specific tourism item in Korea.
@@ -283,7 +277,7 @@ async def get_detailed_information(
 @mcp.tool()
 async def get_tourism_images(
     content_id: str,
-    language: Optional[str] = None,
+    language: str = None,
 ) -> Dict[str, Any]:
     """
     Get images for a specific tourism item in Korea.
@@ -309,8 +303,8 @@ async def get_tourism_images(
 
 @mcp.tool()
 async def get_area_codes(
-    parent_area_code: Optional[str] = None,
-    language: Optional[str] = None,
+    parent_area_code: str = None,
+    language: str = None,
 ) -> Dict[str, Any]:
     """
     Get area codes for regions in Korea.
@@ -333,3 +327,14 @@ async def get_area_codes(
         "items": results.get("items", []),
         "parent_area_code": parent_area_code
     }
+
+
+if __name__ == "__main__":
+    from argparse import ArgumentParser
+    from typing import Literal
+
+    parser = ArgumentParser()
+    parser.add_argument("--transport", type=Literal["stdio", "sse"], default="stdio")
+    args = parser.parse_args()
+
+    mcp.run(transport=args.transport)
