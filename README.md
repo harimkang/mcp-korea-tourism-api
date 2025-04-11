@@ -98,7 +98,7 @@ npx -y @smithery/cli install @harimkang/mcp-korea-tourism-api --client claude
 2.  **Build the Docker Image:**
     Replace `"YOUR_KTO_API_KEY"` with the actual key you obtained. This command builds the image using the provided `Dockerfile`, passing the API key securely as a build argument.
     ```bash
-    >>> docker build -t mcp-korea-tourism .
+    >>> docker build -t mcp-korea-tourism-api .
 
     [+] Building 2.7s (13/13) FINISHED                                                 docker:desktop-linux
     => [internal] load build definition from Dockerfile                                               0.0s
@@ -126,7 +126,7 @@ npx -y @smithery/cli install @harimkang/mcp-korea-tourism-api --client claude
     REPOSITORY                              TAG                IMAGE ID       CREATED          SIZE
     mcp-korea-tourism                       latest             d7d074e85a66   12 seconds ago   215MB
     ```
-    * `-t mcp-korea-tourism`: Tags the built image with the name `mcp-korea-tourism`.
+    * `-t mcp-korea-tourism-api`: Tags the built image with the name `mcp-korea-tourism-api`.
     * `.`: Specifies the current directory as the build context.
 
 3.  **Run the Docker Container:**
@@ -134,7 +134,7 @@ npx -y @smithery/cli install @harimkang/mcp-korea-tourism-api --client claude
 
     *   **Interactive Mode (for manual testing):**
         ```bash
-        docker run --rm -it -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" mcp-korea-tourism
+        docker run --rm -it -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" mcp-korea-tourism-api
         ```
         * `--rm`: Automatically removes the container when it exits.
         * `-it`: Runs in interactive mode, attaching your terminal to the container's stdio.
@@ -142,7 +142,7 @@ npx -y @smithery/cli install @harimkang/mcp-korea-tourism-api --client claude
 
     *   **Detached Mode (for background):**
         ```bash
-        docker run --name tourism-mcp -d -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" mcp-korea-tourism
+        docker run --name tourism-mcp -d -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" mcp-korea-tourism-api
         ```
         * `--name tourism-mcp`: Assigns a name to the container.
         * `-d`: Runs the container in detached (background) mode.
@@ -152,7 +152,7 @@ npx -y @smithery/cli install @harimkang/mcp-korea-tourism-api --client claude
 
 To use this MCP server within Cursor:
 
-1.  **Ensure the Docker container is runnable:** Follow the Docker installation steps above to build the image (`mcp-korea-tourism`). You don't need to manually run the container; Cursor will do that.
+1.  **Ensure the Docker container is runnable:** Follow the Docker installation steps above to build the image (`mcp-korea-tourism-api`). You don't need to manually run the container; Cursor will do that.
 2.  **Locate your `mcp.json` file:** This file configures MCP tools for Cursor. You can usually find it via Cursor's settings or potentially in a path like `~/.cursor/mcp.json` or similar.
 3.  **Add or Update the MCP Configuration:** Add the following JSON object to the list within your `mcp.json` file. If you already have an entry for this tool, update its `command`. Replace `"YOUR_KTO_API_KEY"` with your actual key.
     ![cursor_integrations](images/cursor_integration.png)
@@ -168,7 +168,7 @@ To use this MCP server within Cursor:
                     "-i",
                     "-e",
                     "KOREA_TOURISM_API_KEY=YOUR_KTO_API_KEY",
-                    "mcp-korea-tourism"
+                    "mcp-korea-tourism-api"
                 ]
             }
         }
