@@ -11,12 +11,14 @@ RUN pip install --no-cache-dir uv
 WORKDIR /app
 
 # Copy dependency files first to leverage Docker cache
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml ./
 
-# Install dependencies using uv based on the lock file
-# The --system flag is not needed/valid for uv sync
-# --frozen ensures that the exact versions from the lock file are used
-RUN uv sync --frozen
+# Generate requirements.txt from pyproject.toml dependencies section directly
+# This avoids trying to find the local project and only focuses on external dependencies
+RUN python -c "import tomllib; deps = tomllib.load(open('pyproject.toml', 'rb'))['project']['dependencies']; print('\n'.join(deps))" > requirements.txt
+
+# Install dependencies using pip from the requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application source code (including the src directory)
 COPY . .
@@ -24,7 +26,8 @@ COPY . .
 # Install the project itself from the src directory
 # This makes the mcp_tourism package available to the Python interpreter
 # --no-deps prevents reinstalling already synced dependencies
-RUN uv pip install . --no-deps
+# --system is required because we are not in a virtual environment
+RUN uv pip install . --no-deps --system
 
 # Set the API key as an environment variable
 # IMPORTANT: It's strongly recommended to pass the API key securely at runtime using -e.
