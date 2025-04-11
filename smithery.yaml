@@ -1,0 +1,23 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required:
+      - koreaTourismApiKey
+    properties:
+      koreaTourismApiKey:
+        type: string
+        description: The API key provided by the Korea Tourism Organization.
+  commandFunction:
+    # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
+    |-
+    (config) => ({
+      command: 'python',
+      args: ['-m', 'mcp_tourism.server'],
+      env: { KOREA_TOURISM_API_KEY: config.koreaTourismApiKey }
+    })
+  exampleConfig:
+    koreaTourismApiKey: YOUR_KTO_API_KEY

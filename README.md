@@ -1,9 +1,11 @@
 # Korea Tourism API MCP Server ✈️
 
 <!-- Badges -->
+[![smithery badge](https://smithery.ai/badge/@harimkang/mcp-korea-tourism-api)](https://smithery.ai/interface/@harimkang/mcp-korea-tourism-api)
 [![PyPI version](https://badge.fury.io/py/mcp-korea-tourism-api.svg)](https://badge.fury.io/py/mcp-korea-tourism-api)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI Tests](https://github.com/harimkang/mcp-korea-tourism-api/actions/workflows/ci.yml/badge.svg)](https://github.com/harimkang/mcp-korea-tourism-api/actions/workflows/ci.yml)
+
 
 Unlock the wonders of South Korean tourism directly within your AI assistant! This project provides a Model Context Protocol (MCP) server powered by the official Korea Tourism Organization (KTO) API. Equip your AI with the ability to discover vibrant festivals, serene temples, delicious restaurants, comfortable accommodations, and much more across Korea.
 
@@ -51,6 +53,13 @@ Before you begin, you **must** obtain an API key from the **Korea Tourism Organi
 
 You can run this MCP server using either `uv` (a fast Python package installer and runner) or `Docker`.
 
+### Installing via Smithery
+
+To install Korea Tourism API MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/interface/@harimkang/mcp-korea-tourism-api):
+
+```bash
+npx -y @smithery/cli install @harimkang/mcp-korea-tourism-api --client claude
+```
 ### Option 1: Using `uv` (Recommended for local development)
 
 1.  **Clone the repository:**
