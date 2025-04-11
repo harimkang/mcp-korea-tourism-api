@@ -55,7 +55,7 @@ You can run this MCP server using either `uv` (a fast Python package installer a
 
 ### Installing via Smithery
 
-To install Korea Tourism API MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/interface/@harimkang/mcp-korea-tourism-api):
+To install Korea Tourism API MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@harimkang/mcp-korea-tourism-api):
 
 ```bash
 npx -y @smithery/cli install @harimkang/mcp-korea-tourism-api --client claude
