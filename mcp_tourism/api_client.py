@@ -181,7 +181,7 @@ class KoreaTourismApiClient:
             # Add common parameters
             full_params = {
                 "MobileOS": "ETC",
-                "MobileApp": "TripFlow",
+                "MobileApp": "MobileApp",
                 "numOfRows": "100",  # Default to 100 results per request
                 "pageNo": "1",
                 "_type": "json",  # Return JSON format
