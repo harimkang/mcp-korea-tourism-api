@@ -35,18 +35,32 @@ LANGUAGE_SERVICE_MAP = {
 
 class TourismApiError(Exception):
     """Base exception for Tourism API errors"""
-    pass
+    def __init__(self, message: str, response: Optional[httpx.Response] = None, request: Optional[httpx.Request] = None):
+        super().__init__(message)
+        self.message = message
+        self.response = response
+        self.request = request
+
+    def __str__(self) -> str:
+        base_str = super().__str__()
+        if self.response:
+            base_str += f" (Status Code: {self.response.status_code})"
+        if self.request:
+            base_str += f" (Request URL: {self.request.url})"
+        return base_str
 
 class TourismApiConnectionError(TourismApiError):
     """Connection error with Tourism API"""
-    pass
+    # Usually no response, so focus on request
+    def __init__(self, message: str, request: Optional[httpx.Request] = None):
+         super().__init__(message, response=None, request=request)
 
 class TourismApiClientError(TourismApiError):
-    """Client-side error with Tourism API requests"""
+    """Client-side error with Tourism API requests (4xx)"""
     pass
 
 class TourismApiServerError(TourismApiError):
-    """Server-side error with Tourism API operations"""
+    """Server-side error with Tourism API operations (5xx)"""
     pass
 
 class KoreaTourismApiClient:
@@ -63,6 +77,36 @@ class KoreaTourismApiClient:
     
     # Base URL for all services
     BASE_URL = "http://apis.data.go.kr/B551011"
+    
+    # --- Constants for API Parameters ---
+    DEFAULT_NUM_OF_ROWS = 100
+    DEFAULT_PAGE_NO = 1
+    MOBILE_OS = "ETC"
+    MOBILE_APP = "MobileApp"
+    RESPONSE_FORMAT = "json"
+    ARRANGE_MODIFIED_WITH_IMAGE = "Q" # Sort by modified date with image
+    LIST_YN_YES = "Y"
+    DEFAULT_YN_YES = "Y"
+    DEFAULT_YN_NO = "N"
+    FIRST_IMAGE_YN_YES = "Y"
+    FIRST_IMAGE_YN_NO = "N"
+    AREACODE_YN_YES = "Y"
+    AREACODE_YN_NO = "N"
+    CATCODE_YN_YES = "Y"
+    CATCODE_YN_NO = "N"
+    ADDRINFO_YN_YES = "Y"
+    ADDRINFO_YN_NO = "N"
+    MAPINFO_YN_YES = "Y"
+    MAPINFO_YN_NO = "N"
+    OVERVIEW_YN_YES = "Y"
+    OVERVIEW_YN_NO = "N"
+    TRANS_GUIDE_YN_YES = "Y"
+    TRANS_GUIDE_YN_NO = "N"
+    IMAGE_YN_YES = "Y"
+    IMAGE_YN_NO = "N"
+    SUB_IMAGE_YN_YES = "Y"
+    SUB_IMAGE_YN_NO = "N"
+    # --- End Constants ---
     
     # Common endpoints (will be prefixed with service name)
     AREA_BASED_LIST_ENDPOINT = "/areaBasedList1"
@@ -81,55 +125,85 @@ class KoreaTourismApiClient:
     # Class-level connection pool and semaphore for concurrency control
     _shared_client: ClassVar[Optional[httpx.AsyncClient]] = None
     _client_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
-    _request_semaphore: ClassVar[asyncio.Semaphore] = asyncio.Semaphore(10)  # Limit to 10 concurrent requests
-    
-    def __init__(self, api_key: str, language: str = "en"):
+    # Make concurrency limit configurable
+    # _request_semaphore: ClassVar[asyncio.Semaphore] = asyncio.Semaphore(10)
+
+    def __init__(
+        self,
+        api_key: str,
+        language: str = "en",
+        cache_ttl: int = 86400,
+        rate_limit_calls: int = 5,
+        rate_limit_period: int = 1,
+        concurrency_limit: int = 10
+    ):
         """
-        Initialize with optional language configuration.
-        
+        Initialize with API key and optional configurations.
+
         Args:
-            language: Language code for content (en, ko, jp, zh-cn, zh-tw, de, fr, es, ru)
+            api_key: The API key for the Korea Tourism Organization.
+            language: Default language code for content (en, ko, jp, etc.).
+            cache_ttl: Time-to-live for cached responses in seconds.
+            rate_limit_calls: Maximum number of API calls allowed.
+            rate_limit_period: Time period (in seconds) for the rate limit.
+            concurrency_limit: Maximum number of concurrent API requests.
         """
         self.api_key = api_key
-        if not self.api_key:
-            raise ValueError("Korean Tourism API key must be provided in settings")
-            
-        # Initialize logger as a simple attribute to avoid heavy logger setup at init time
+        if not self.api_key or self.api_key == "missing_api_key": # Check for placeholder too
+            # Log warning here instead of raising immediately, allows lazy init check
+            logging.warning("Korean Tourism API key is missing or invalid.")
+            # We don't raise here because get_api_client in server.py handles this
+
         self._logger_name = "tourism_api_client"
-            
-        # Set language service
-        self.language = language.lower()
-        self.service_name = None
-        self.full_base_url = None
-        
-        # Lazy initialization will happen at first request
+
+        # Store configuration parameters
+        self.default_language = language.lower()
+        self._cache_ttl = cache_ttl
+        self._rate_limit_calls = rate_limit_calls
+        self._rate_limit_period = rate_limit_period
+        self._concurrency_limit = concurrency_limit
+
+        # Lazy initialization flags/placeholders
+        self.service_name: Optional[str] = None
+        self.full_base_url: Optional[str] = None
         self._is_fully_initialized = False
-        
-        # Cache will be initialized on first use
-        self._cache = None
-        
+        self._cache: Optional[TTLCache] = None
+        self._request_semaphore: Optional[asyncio.Semaphore] = None
+        self.logger: Optional[logging.Logger] = None # Add logger type hint
+
     def _ensure_full_initialization(self):
         """Ensure all initialization tasks are completed before first API request"""
         if self._is_fully_initialized:
             return
-            
+
         # Get logger
-        import logging
         self.logger = logging.getLogger(self._logger_name)
-        
-        # Initialize language service
+        if not self.logger.hasHandlers(): # Basic check to prevent duplicate handlers if called multiple times
+             logging.basicConfig(level=logging.INFO) # Basic config if not already set
+
+        # Validate API key presence here before proceeding
+        if not self.api_key or self.api_key == "missing_api_key":
+            self.logger.error("Cannot proceed without a valid KOREA_TOURISM_API_KEY.")
+            # Raising here prevents further operations if key is truly missing
+            raise ValueError("Korean Tourism API key must be provided and valid.")
+
+        # Initialize language service using the stored default
+        self.language = self.default_language
         if self.language not in LANGUAGE_SERVICE_MAP:
             self.logger.warning(f"Unsupported language: {self.language}. Falling back to English.")
             self.language = "en"
-            
+
         self.service_name = LANGUAGE_SERVICE_MAP[self.language]
         self.full_base_url = f"{self.BASE_URL}/{self.service_name}"
-        
-        # Initialize cache
-        self._cache = TTLCache(maxsize=1000, ttl=86400)  # Cache responses for 24 hours by default
-        
+
+        # Initialize cache with configured TTL
+        self._cache = TTLCache(maxsize=1000, ttl=self._cache_ttl)
+
+        # Initialize semaphore with configured concurrency limit
+        self._request_semaphore = asyncio.Semaphore(self._concurrency_limit)
+
         self._is_fully_initialized = True
-        
+
     @property
     def cache(self):
         """Lazy cache initialization"""
@@ -160,6 +234,7 @@ class KoreaTourismApiClient:
         # Check status code first for efficiency
         if response.status_code >= 400:
             status_code = response.status_code
+            request = response.request # Get the request object
             
             # Try to extract error message
             error_msg = f"Tourism API error: HTTP {status_code}"
@@ -172,124 +247,143 @@ class KoreaTourismApiClient:
                 
             # Map status code to exception type
             if status_code >= 400 and status_code < 500:
-                raise TourismApiClientError(f"Client error: {error_msg}")
+                # Pass response and request to the exception
+                raise TourismApiClientError(f"Client error: {error_msg}", response=response, request=request)
             else:
-                raise TourismApiServerError(f"Server error: {error_msg}")
+                # Pass response and request to the exception
+                raise TourismApiServerError(f"Server error: {error_msg}", response=response, request=request)
     
-    def _get_cache_key(self, endpoint: str, params: Dict[str, Any]) -> str:
-        """Generate a unique cache key for an API request"""
-        # Sort params to ensure consistent keys
+    def _get_cache_key(self, endpoint: str, params: Dict[str, Any], language: str) -> str:
+        """Generate a unique cache key for an API request, including language."""
+        # Sort params to ensure consistent keys, exclude common/dynamic ones
         sorted_params = sorted(
-            [(k, v) for k, v in params.items() if k != "MobileOS" and k != "MobileApp"]
+            [(k, v) for k, v in params.items() if k not in ("MobileOS", "MobileApp", "serviceKey", "_type")]
         )
         # Include language in cache key
-        param_str = f"lang={self.language}&" + "&".join([f"{k}={v}" for k, v in sorted_params])
+        param_str = f"lang={language}&" + "&".join([f"{k}={v}" for k, v in sorted_params])
         return f"{endpoint}?{param_str}"
     
-    @sleep_and_retry
-    @limits(calls=5, period=1)  # 5 calls per second
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type((httpx.ConnectTimeout, httpx.ConnectError, TourismApiServerError)),
         reraise=True
     )
-    async def _make_request(self, endpoint: str, params: Dict[str, Any], use_cache: bool = True) -> Dict[str, Any]:
-        """Make a request to the API with caching and rate limiting"""
+    async def _make_request(self, endpoint: str, params: Dict[str, Any], use_cache: bool = True, language_override: Optional[str] = None) -> Dict[str, Any]:
+        """Make a request to the API with caching, rate limiting, and language override."""
         # Ensure all initialization is completed
         self._ensure_full_initialization()
+        # Check logger and semaphore are initialized
+        if self.logger is None or self._request_semaphore is None:
+             raise RuntimeError("Client not fully initialized. Logger or semaphore missing.")
+
+        # Determine the language and base URL for this specific request
+        request_language = self.language
+        if language_override:
+            lang_lower = language_override.lower()
+            if lang_lower in LANGUAGE_SERVICE_MAP:
+                request_language = lang_lower
+            else:
+                 self.logger.warning(f"Unsupported language override: {language_override}. Falling back to client default: {self.language}.")
         
-        # Check cache first if caching is enabled
+        request_service_name = LANGUAGE_SERVICE_MAP[request_language]
+        request_full_base_url = f"{self.BASE_URL}/{request_service_name}"
+        
+        # Check cache first if caching is enabled, using the request-specific language
         if use_cache:
-            cache_key = self._get_cache_key(endpoint, params)
+            cache_key = self._get_cache_key(endpoint, params, request_language)
             cached_response = self.cache.get(cache_key)
             if cached_response:
                 self.logger.debug(f"Cache hit for {cache_key}")
                 return cached_response
-        
-        # Use concurrency semaphore to limit simultaneous requests
-        async with self._request_semaphore:
-            # Add common parameters
-            full_params = {
-                "MobileOS": "ETC",
-                "MobileApp": "MobileApp",
-                "numOfRows": "100",  # Default to 100 results per request
-                "pageNo": "1",
-                "_type": "json",  # Return JSON format
-                **params
-            }
-            
-            # The API key is already URL-encoded in the settings, so we add it separately
-            # to avoid double-encoding
-            serviceKey = self.api_key
-            
-            # Build the full URL with proper service
-            url = f"{self.full_base_url}{endpoint}"
-            
-            client = await self.get_shared_client()
-            
-            # First, encode the parameters
-            encoded_params = urllib.parse.urlencode(full_params)
-            
-            # Then append the already-encoded service key
-            full_url = f"{url}?serviceKey={serviceKey}&{encoded_params}"
-            
-            self.logger.debug(f"Making request to URL: {full_url}")
-            response = await client.get(full_url)
-            
-            self._process_response_error(response)
-            
-            # Parse the response with better error handling
-            try:
-                # Check if the response has content
-                if not response.content or len(response.content.strip()) == 0:
-                    self.logger.error("Empty response received from tourism API")
-                    raise TourismApiError("Empty response received from tourism API")
-                
-                result = response.json()
-            except json.JSONDecodeError as e:
-                self.logger.error(f"Failed to parse JSON response: {e}. Response content: {response.text[:200]}")
-                raise TourismApiError(f"Invalid JSON response: {str(e)}")
-            
-            # Extract the items from the nested response structure
-            try:
-                response_header = result["response"]["header"]
-                response_body = result["response"]["body"]
-                
-                result_code = response_header.get("resultCode")
-                if result_code != "0000":
-                    raise TourismApiError(f"API error: {response_header.get('resultMsg', 'Unknown error')}")
-                
-                total_count = response_body.get("totalCount", 0)
-                items = []
-                
-                if total_count > 0:
-                    items_container = response_body.get("items", {})
-                    if "item" in items_container:
-                        items = items_container["item"]
-                        if not isinstance(items, list):
-                            items = [items]  # Ensure items is a list even if there's only one result
-                
-                # Structure the results
-                result_data = {
-                    "total_count": total_count,
-                    "num_of_rows": response_body.get("numOfRows", 0),
-                    "page_no": response_body.get("pageNo", 1),
-                    "items": items
-                }
-                
-                # Cache the response if caching is enabled
-                if use_cache:
-                    cache_key = self._get_cache_key(endpoint, params)
-                    self.cache[cache_key] = result_data
-                
-                return result_data
-                
-            except (KeyError, TypeError) as e:
-                self.logger.error(f"Error parsing Tourism API response: {e}")
-                raise TourismApiError(f"Failed to parse API response: {e}")
 
-    
+        # Apply rate limiting dynamically here using instance attributes
+        @sleep_and_retry
+        @limits(calls=self._rate_limit_calls, period=self._rate_limit_period)
+        async def rate_limited_request():
+             # Use concurrency semaphore to limit simultaneous requests
+             async with self._request_semaphore: # Use the instance semaphore
+                 # Add common parameters using constants
+                 full_params = {
+                     "MobileOS": self.MOBILE_OS,
+                     "MobileApp": self.MOBILE_APP,
+                     # Defaults like numOfRows/pageNo are better set by calling methods or API defaults
+                     "_type": self.RESPONSE_FORMAT,
+                     **params
+                 }
+                 
+                 # API key handling remains the same for now
+                 serviceKey = self.api_key # Already validated in _ensure_full_initialization
+                 
+                 # Build the full URL with the determined service for this request
+                 url = f"{request_full_base_url}{endpoint}"
+                 
+                 client = await self.get_shared_client()
+                 
+                 # First, encode the parameters
+                 encoded_params = urllib.parse.urlencode(full_params)
+                 
+                 # Then append the already-encoded service key
+                 full_url = f"{url}?serviceKey={serviceKey}&{encoded_params}"
+                 
+                 self.logger.debug(f"Making request to URL: {full_url}")
+                 response = await client.get(full_url)
+                 
+                 self._process_response_error(response)
+                 
+                 # Parse the response with better error handling
+                 try:
+                     # Check if the response has content
+                     if not response.content or len(response.content.strip()) == 0:
+                         self.logger.error("Empty response received from tourism API")
+                         raise TourismApiError("Empty response received from tourism API")
+                     
+                     result = response.json()
+                 except json.JSONDecodeError as e:
+                     self.logger.error(f"Failed to parse JSON response: {e}. Response content: {response.text[:200]}")
+                     raise TourismApiError(f"Invalid JSON response: {str(e)}")
+                 
+                 # Extract the items from the nested response structure
+                 try:
+                     response_header = result["response"]["header"]
+                     response_body = result["response"]["body"]
+                     
+                     result_code = response_header.get("resultCode")
+                     if result_code != "0000":
+                         raise TourismApiError(f"API error: {response_header.get('resultMsg', 'Unknown error')}")
+                     
+                     total_count = response_body.get("totalCount", 0)
+                     items = []
+                     
+                     if total_count > 0:
+                         items_container = response_body.get("items", {})
+                         if "item" in items_container:
+                             items = items_container["item"]
+                             if not isinstance(items, list):
+                                 items = [items]  # Ensure items is a list even if there's only one result
+                     
+                     # Structure the results
+                     result_data = {
+                         "total_count": total_count,
+                         "num_of_rows": response_body.get("numOfRows", 0),
+                         "page_no": response_body.get("pageNo", 1),
+                         "items": items
+                     }
+                     
+                     # Cache the response if caching is enabled, using the request-specific language
+                     if use_cache:
+                         cache_key = self._get_cache_key(endpoint, params, request_language)
+                         self.cache[cache_key] = result_data # Use property access for cache
+                     
+                     return result_data
+                     
+                 except (KeyError, TypeError) as e:
+                     self.logger.error(f"Error parsing Tourism API response: {e}")
+                     raise TourismApiError(f"Failed to parse API response: {e}")
+
+        # Call the inner function that has the decorators applied
+        return await rate_limited_request()
+
     async def search_by_keyword(
         self,
         keyword: str,
@@ -308,7 +402,7 @@ class KoreaTourismApiClient:
         /searchKeyword1
         
         Args:
-            keyword: Search keyword
+            keyword: Search keyword (required)
             content_type_id: Content type ID to filter results
             area_code: Area code to filter results
             sigungu_code: Sigungu code to filter results, areaCode is required
@@ -351,14 +445,19 @@ class KoreaTourismApiClient:
                 ]
             }
         """
+        if not keyword:
+            raise ValueError("Keyword must be provided for search_by_keyword")
+            
         params: Dict[str, Any] = {
-            "keyword": keyword,  # Required by the API
-            "arrange": "Q",  # Sort by {A: alphabetically, C: modified date, D: created date, O: alphabetically with image, Q: modified date with image, R: created date with image}
-            "listYN": "Y",   # Return as a list
-            "contentTypeId": content_type_id or "",
+            "keyword": keyword,
+            "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,
+            "listYN": self.LIST_YN_YES,
             "pageNo": str(page),
             "numOfRows": str(rows),
         }
+
+        if content_type_id:
+             params["contentTypeId"] = content_type_id
 
         if area_code:
             params["areaCode"] = area_code
@@ -375,13 +474,12 @@ class KoreaTourismApiClient:
                 if cat3:
                     params["cat3"] = cat3
         
-        # If a specific language is requested, create a new client with that language
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.SEARCH_KEYWORD_ENDPOINT, params)
-        
-        # Otherwise use the current client's language
-        return await self._make_request(self.SEARCH_KEYWORD_ENDPOINT, params)
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.SEARCH_KEYWORD_ENDPOINT,
+            params,
+            language_override=language
+        )
     
     async def get_area_based_list(
         self,
@@ -441,11 +539,11 @@ class KoreaTourismApiClient:
             }
         """
         params: Dict[str, Any] = {
-            "arrange": "Q",  # Sort by {A: alphabetically, C: modified date, D: created date, O: alphabetically with image, Q: modified date with image, R: created date with image}
-            "listYN": "Y",   # Return as a list
+            "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,
+            "listYN": self.LIST_YN_YES,
             "pageNo": str(page),
             "numOfRows": str(rows),
-            "_type": "json",
+            # "_type": self.RESPONSE_FORMAT, # Added in _make_request
         }
         
         # Add optional filters
@@ -467,13 +565,12 @@ class KoreaTourismApiClient:
                 if cat3:
                     params["cat3"] = cat3
         
-        # If a specific language is requested, create a new client with that language
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.AREA_BASED_LIST_ENDPOINT, params)
-            
-        # Otherwise use the current client's language
-        return await self._make_request(self.AREA_BASED_LIST_ENDPOINT, params)
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.AREA_BASED_LIST_ENDPOINT,
+            params,
+            language_override=language
+        )
 
     async def get_location_based_list(
         self,
@@ -529,26 +626,39 @@ class KoreaTourismApiClient:
                 ]
             }
         """
+        # Parameter validation
+        if mapx is None or mapy is None or radius is None:
+            raise ValueError("mapx, mapy, and radius are required for location-based search")
+        try:
+            # Ensure radius is a positive integer
+            radius_int = int(radius)
+            if radius_int <= 0:
+                 raise ValueError("radius must be a positive integer")
+        except ValueError:
+             raise ValueError("radius must be a valid integer")
+        # Basic type check for coordinates (can be enhanced)
+        if not isinstance(mapx, (float, int)) or not isinstance(mapy, (float, int)):
+             self.logger.warning("mapx and mapy should ideally be floats or integers.")
+
         params: Dict[str, Any] = {
-            "listYN": "Y",   # Return as a list
+            "listYN": self.LIST_YN_YES,
             "pageNo": str(page),
             "numOfRows": str(rows),
-            "arrange": "Q",  # Sort by {A: alphabetically, C: modified date, D: created date, O: alphabetically with image, Q: modified date with image, R: created date with image}
-            "mapX": str(mapx),  # Required by the API
-            "mapY": str(mapy),  # Required by the API
-            "radius": str(radius),  # Required by the API
+            "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,
+            "mapX": str(mapx),
+            "mapY": str(mapy),
+            "radius": str(radius_int),
         }
 
         if content_type_id:
             params["contentTypeId"] = content_type_id
         
-        # If a specific language is requested, create a new client with that language
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.LOCATION_BASED_LIST_ENDPOINT, params)
-        
-        # Otherwise use the current client's language
-        return await self._make_request(self.LOCATION_BASED_LIST_ENDPOINT, params)
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.LOCATION_BASED_LIST_ENDPOINT,
+            params,
+            language_override=language
+        )
 
     async def search_festival(
         self,
@@ -603,10 +713,20 @@ class KoreaTourismApiClient:
                 ]
             }
         """
+        if not event_start_date:
+            raise ValueError("event_start_date (YYYYMMDD) is required")
+        # Basic format check (can be improved with regex)
+        if not (isinstance(event_start_date, str) and len(event_start_date) == 8 and event_start_date.isdigit()):
+             raise ValueError("event_start_date must be in YYYYMMDD format")
+        if event_end_date and not (isinstance(event_end_date, str) and len(event_end_date) == 8 and event_end_date.isdigit()):
+             raise ValueError("event_end_date must be in YYYYMMDD format")
+
         params: Dict[str, Any] = {
             "eventStartDate": event_start_date,
             "pageNo": str(page),
             "numOfRows": str(rows),
+            "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE, # Default arrange added
+            "listYN": self.LIST_YN_YES,                # Default listYN added
         }
 
         if event_end_date:
@@ -618,13 +738,12 @@ class KoreaTourismApiClient:
             if sigungu_code:
                 params["sigunguCode"] = sigungu_code
 
-        # If a specific language is requested, create a new client with that language
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.SEARCH_FESTIVAL_ENDPOINT, params)
-        
-        # Otherwise use the current client's language
-        return await self._make_request(self.SEARCH_FESTIVAL_ENDPOINT, params)
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.SEARCH_FESTIVAL_ENDPOINT,
+            params,
+            language_override=language
+        )
 
     async def search_stay(
         self,
@@ -680,6 +799,8 @@ class KoreaTourismApiClient:
         params: Dict[str, Any] = {
             "pageNo": str(page),
             "numOfRows": str(rows),
+            "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE, # Default arrange added
+            "listYN": self.LIST_YN_YES,                # Default listYN added
         }
 
         if area_code:
@@ -688,13 +809,12 @@ class KoreaTourismApiClient:
             if sigungu_code:
                 params["sigunguCode"] = sigungu_code
 
-        # If a specific language is requested, create a new client with that language
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.SEARCH_STAY_ENDPOINT, params)
-        
-        # Otherwise use the current client's language
-        return await self._make_request(self.SEARCH_STAY_ENDPOINT, params)
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.SEARCH_STAY_ENDPOINT,
+            params,
+            language_override=language
+        )
 
     async def get_detail_common(
         self,
@@ -767,6 +887,8 @@ class KoreaTourismApiClient:
                 ]
             }
         """
+        if not content_id:
+            raise ValueError("content_id is required")
             
         params: Dict[str, Any] = {
             "contentId": content_id,
@@ -785,13 +907,12 @@ class KoreaTourismApiClient:
         if content_type_id:
             params["contentTypeId"] = content_type_id
 
-        # If a specific language is requested, create a new client with that language
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.DETAIL_COMMON_ENDPOINT, params)
-            
-        # Otherwise use the current client's language
-        return await self._make_request(self.DETAIL_COMMON_ENDPOINT, params)
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.DETAIL_COMMON_ENDPOINT,
+            params,
+            language_override=language
+        )
     
     async def get_detail_images(
         self,
@@ -832,6 +953,9 @@ class KoreaTourismApiClient:
                 ]
             }
         """
+        if not content_id:
+             raise ValueError("content_id is required")
+             
         params: Dict[str, Any] = {
             "contentId": content_id,
             "imageYN": image_yn,
@@ -841,13 +965,12 @@ class KoreaTourismApiClient:
         }
 
         
-        # If a specific language is requested, create a new client with that language
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.DETAIL_IMAGE_ENDPOINT, params)
-            
-        # Otherwise use the current client's language
-        return await self._make_request(self.DETAIL_IMAGE_ENDPOINT, params)
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.DETAIL_IMAGE_ENDPOINT,
+            params,
+            language_override=language
+        )
 
     async def get_detail_intro(
         self,
@@ -916,6 +1039,11 @@ class KoreaTourismApiClient:
             
             Note: The actual fields returned depend on the content_type_id and will vary between different types of tourism items.
         """
+        if not content_id:
+             raise ValueError("content_id is required")
+        if not content_type_id:
+             raise ValueError("content_type_id is required")
+             
         params: Dict[str, Any] = {
             "contentId": content_id,
             "contentTypeId": content_type_id,
@@ -923,13 +1051,12 @@ class KoreaTourismApiClient:
             "pageNo": str(page)
         }
 
-        # If a specific language is requested, create a new client with that language
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.DETAIL_INTRO_ENDPOINT, params)
-            
-        # Otherwise use the current client's language
-        return await self._make_request(self.DETAIL_INTRO_ENDPOINT, params)
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.DETAIL_INTRO_ENDPOINT,
+            params,
+            language_override=language
+        )
     
     async def get_detail_info(
         self,
@@ -970,6 +1097,11 @@ class KoreaTourismApiClient:
             
             Note: Each item in the 'items' list represents a specific piece of additional information about the tourism item.
         """
+        if not content_id:
+             raise ValueError("content_id is required")
+        if not content_type_id:
+             raise ValueError("content_type_id is required")
+             
         params: Dict[str, Any] = {
             "contentId": content_id,
             "contentTypeId": content_type_id,
@@ -977,13 +1109,12 @@ class KoreaTourismApiClient:
             "pageNo": str(page)
         }
 
-        # If a specific language is requested, create a new client with that language
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.DETAIL_INFO_ENDPOINT, params)
-        
-        # Otherwise use the current client's language
-        return await self._make_request(self.DETAIL_INFO_ENDPOINT, params)
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.DETAIL_INFO_ENDPOINT,
+            params,
+            language_override=language
+        )
 
     async def get_area_based_sync_list(
         self,
@@ -1046,10 +1177,10 @@ class KoreaTourismApiClient:
             }
         """
         params: Dict[str, Any] = {
-            "numOfRows": rows,
-            "pageNo": page,
-            "listYN": "Y",
-            "arrange": "Q",
+            "numOfRows": str(rows), # Use str()
+            "pageNo": str(page),    # Use str()
+            "listYN": self.LIST_YN_YES,
+            "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,
         }
         if show_flag:
             params["showFlag"] = show_flag
@@ -1072,11 +1203,12 @@ class KoreaTourismApiClient:
         if content_type_id:
             params["contentTypeId"] = content_type_id
         
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.AREA_BASED_SYNC_LIST_ENDPOINT, params)
-            
-        return await self._make_request(self.AREA_BASED_SYNC_LIST_ENDPOINT, params)
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.AREA_BASED_SYNC_LIST_ENDPOINT,
+            params,
+            language_override=language
+        )
 
     async def get_area_code_list(
         self,
@@ -1114,17 +1246,18 @@ class KoreaTourismApiClient:
             If area_code is not provided, returns top-level area codes.
         """
         params: Dict[str, Any] = {
-            "numOfRows": rows,
-            "pageNo": page,
+            "numOfRows": str(rows), # Use str()
+            "pageNo": str(page),    # Use str()
         }
         if area_code:
             params["areaCode"] = area_code
 
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.AREA_CODE_LIST_ENDPOINT, params)
-            
-        return await self._make_request(self.AREA_CODE_LIST_ENDPOINT, params)
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.AREA_CODE_LIST_ENDPOINT,
+            params,
+            language_override=language
+        )
 
     async def get_category_code_list(
         self,
@@ -1170,8 +1303,8 @@ class KoreaTourismApiClient:
             - With cat1 and cat2: Returns subcategories (cat3) under that cat2
         """
         params: Dict[str, Any] = {
-            "numOfRows": rows,
-            "pageNo": page,
+            "numOfRows": str(rows), # Use str()
+            "pageNo": str(page),    # Use str()
         }
 
         if content_type_id:
@@ -1185,11 +1318,13 @@ class KoreaTourismApiClient:
 
                 if cat3:
                     params["cat3"] = cat3
-        if language and language.lower() != self.language:
-            temp_client = KoreaTourismApiClient(api_key=self.api_key, language=language)
-            return await temp_client._make_request(self.CATEGORY_CODE_LIST_ENDPOINT, params)
-            
-        return await self._make_request(self.CATEGORY_CODE_LIST_ENDPOINT, params)
+        
+        # Pass language override directly to _make_request
+        return await self._make_request(
+            self.CATEGORY_CODE_LIST_ENDPOINT,
+            params,
+            language_override=language
+        )
 
 
 

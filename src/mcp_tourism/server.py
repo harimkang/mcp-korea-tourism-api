@@ -3,14 +3,19 @@ import os
 from typing import Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
 from mcp_tourism.api_client import KoreaTourismApiClient, CONTENTTYPE_ID_MAP
+import logging # Import logging
 
 # Create an MCP server
 mcp = FastMCP(
     name="Korea Tourism API",
     description="API for Korea Tourism information",
-    version="0.1",
+    version="0.1.2", # Increment version for changes
     dependencies=["httpx", "cachetools", "tenacity", "ratelimit"],
 )
+
+# Configure basic logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__) # Get logger for server module
 
 # Lazy initialization of the API client
 _api_client: Optional[KoreaTourismApiClient] = None
@@ -18,25 +23,50 @@ _api_client: Optional[KoreaTourismApiClient] = None
 def get_api_client() -> KoreaTourismApiClient:
     """
     Lazily initialize the API client only when needed.
-    This function is called only when a tool is actually invoked.
+    Reads configuration from environment variables.
     """
     global _api_client
     if _api_client is None:
         # Get API key from environment variable
         api_key = os.environ.get("KOREA_TOURISM_API_KEY")
         
-        # Instead of raising an error immediately, log a warning and use a placeholder
-        # The actual API calls will fail gracefully with proper error messages
         if not api_key:
-            import logging
-            logging.warning(
+            logger.warning(
                 "KOREA_TOURISM_API_KEY environment variable is not set. "
                 "API calls will fail until a valid key is provided."
             )
             api_key = "missing_api_key"  # Placeholder that will cause API calls to fail properly
             
+        # Get configuration from environment variables with defaults
+        default_language = os.environ.get("MCP_TOURISM_DEFAULT_LANGUAGE", "en")
+        cache_ttl = int(os.environ.get("MCP_TOURISM_CACHE_TTL", 86400))
+        rate_limit_calls = int(os.environ.get("MCP_TOURISM_RATE_LIMIT_CALLS", 5))
+        rate_limit_period = int(os.environ.get("MCP_TOURISM_RATE_LIMIT_PERIOD", 1))
+        concurrency_limit = int(os.environ.get("MCP_TOURISM_CONCURRENCY_LIMIT", 10))
+
+        logger.info("Initializing KoreaTourismApiClient with:")
+        logger.info(f"  Default Language: {default_language}")
+        logger.info(f"  Cache TTL: {cache_ttl}s")
+        logger.info(f"  Rate Limit: {rate_limit_calls} calls / {rate_limit_period}s")
+        logger.info(f"  Concurrency Limit: {concurrency_limit}")
+
         # Initialize the client
-        _api_client = KoreaTourismApiClient(api_key=api_key)
+        try:
+            _api_client = KoreaTourismApiClient(
+                api_key=api_key,
+                language=default_language,
+                cache_ttl=cache_ttl,
+                rate_limit_calls=rate_limit_calls,
+                rate_limit_period=rate_limit_period,
+                concurrency_limit=concurrency_limit,
+            )
+            # Trigger initialization check which also validates API key early
+            _api_client._ensure_full_initialization()
+            logger.info("KoreaTourismApiClient initialized successfully.")
+        except ValueError as e:
+             logger.error(f"Failed to initialize KoreaTourismApiClient: {e}")
+             # Propagate the error so the MCP tool call fails clearly
+             raise
     return _api_client
 
 # MCP Tools for Korea Tourism API
@@ -47,6 +77,8 @@ async def search_tourism_by_keyword(
     content_type: str = None,
     area_code: str = None,
     language: str = None,
+    page: int = 1,
+    rows: int = 20,
 ) -> Dict[str, Any]:
     """
     Search for tourism information in Korea by keyword.
@@ -56,6 +88,8 @@ async def search_tourism_by_keyword(
         content_type: Type of content to search for (e.g., "Tourist Attraction", "Restaurant", "Festival Event")
         area_code: Area code to filter results (e.g., "1" for Seoul)
         language: Language for results (e.g., "en", "jp", "zh-cn"), default is "en"
+        page: Page number for pagination (default: 1)
+        rows: Number of items per page (default: 20)
         
     Returns:
         A dictionary containing search results with tourism information.
@@ -63,20 +97,25 @@ async def search_tourism_by_keyword(
     # Get the API client lazily
     client = get_api_client()
     
-    # Convert human-readable content type to ID if provided
+    # Validate and convert content_type
     content_type_id = None
     if content_type:
         content_type_id = next(
             (k for k, v in CONTENTTYPE_ID_MAP.items() if v.lower() == content_type.lower()),
             None
         )
+        if content_type_id is None:
+            valid_types = ", ".join(CONTENTTYPE_ID_MAP.values())
+            raise ValueError(f"Invalid content_type: '{content_type}'. Valid types are: {valid_types}")
     
     # Call the API client
     return await client.search_by_keyword(
         keyword=keyword,
         content_type_id=content_type_id,
         area_code=area_code,
-        language=language
+        language=language,
+        page=page,
+        rows=rows
     )
 
 
@@ -86,6 +125,8 @@ async def get_tourism_by_area(
     sigungu_code: str = None,
     content_type: str = None,
     language: str = None,
+    page: int = 1,
+    rows: int = 20,
 ) -> Dict[str, Any]:
     """
     Browse tourism information by geographic areas in Korea.
@@ -95,24 +136,31 @@ async def get_tourism_by_area(
         sigungu_code: Sigungu (district) code within the area
         content_type: Type of content to filter (e.g., "Tourist Attraction", "Restaurant")
         language: Language for results (e.g., "en", "jp", "zh-cn")
+        page: Page number for pagination (default: 1)
+        rows: Number of items per page (default: 20)
         
     Returns:
         A dictionary containing tourism information in the specified area.
     """
-    # Convert human-readable content type to ID if provided
+    # Validate and convert content_type
     content_type_id = None
     if content_type:
         content_type_id = next(
             (k for k, v in CONTENTTYPE_ID_MAP.items() if v.lower() == content_type.lower()),
             None
         )
+        if content_type_id is None:
+            valid_types = ", ".join(CONTENTTYPE_ID_MAP.values())
+            raise ValueError(f"Invalid content_type: '{content_type}'. Valid types are: {valid_types}")
     
     # Call the API client
     results = await get_api_client().get_area_based_list(
         area_code=area_code,
         sigunguCode=sigungu_code,
         content_type_id=content_type_id,
-        language=language
+        language=language,
+        page=page,
+        rows=rows
     )
     
     return {
@@ -129,6 +177,8 @@ async def find_nearby_attractions(
     radius: int = 1000,
     content_type: str = None,
     language: str = None,
+    page: int = 1,
+    rows: int = 20,
 ) -> Dict[str, Any]:
     """
     Find tourism attractions near a specific location in Korea.
@@ -139,17 +189,22 @@ async def find_nearby_attractions(
         radius: Search radius in meters (default: 1000)
         content_type: Type of content to filter (e.g., "Tourist Attraction", "Restaurant")
         language: Language for results (e.g., "en", "jp", "zh-cn")
+        page: Page number for pagination (default: 1)
+        rows: Number of items per page (default: 20)
         
     Returns:
         A dictionary containing tourism attractions near the specified coordinates.
     """
-    # Convert human-readable content type to ID if provided
+    # Validate and convert content_type
     content_type_id = None
     if content_type:
         content_type_id = next(
             (k for k, v in CONTENTTYPE_ID_MAP.items() if v.lower() == content_type.lower()),
             None
         )
+        if content_type_id is None:
+            valid_types = ", ".join(CONTENTTYPE_ID_MAP.values())
+            raise ValueError(f"Invalid content_type: '{content_type}'. Valid types are: {valid_types}")
     
     # Call the API client
     results = await get_api_client().get_location_based_list(
@@ -157,7 +212,9 @@ async def find_nearby_attractions(
         mapy=latitude,
         radius=radius,
         content_type_id=content_type_id,
-        language=language
+        language=language,
+        page=page,
+        rows=rows
     )
     
     return {
@@ -174,6 +231,8 @@ async def search_festivals_by_date(
     end_date: str = None,
     area_code: str = None,
     language: str = None,
+    page: int = 1,
+    rows: int = 20,
 ) -> Dict[str, Any]:
     """
     Find festivals in Korea by date range.
@@ -183,6 +242,8 @@ async def search_festivals_by_date(
         end_date: Optional end date in YYYYMMDD format (e.g., "20250531")
         area_code: Area code to filter results (e.g., "1" for Seoul)
         language: Language for results (e.g., "en", "jp", "zh-cn")
+        page: Page number for pagination (default: 1)
+        rows: Number of items per page (default: 20)
         
     Returns:
         A dictionary containing festivals occurring within the specified date range.
@@ -192,7 +253,9 @@ async def search_festivals_by_date(
         event_start_date=start_date,
         event_end_date=end_date,
         area_code=area_code,
-        language=language
+        language=language,
+        page=page,
+        rows=rows
     )
     
     return {
@@ -209,6 +272,8 @@ async def find_accommodations(
     area_code: str = None,
     sigungu_code: str = None,
     language: str = None,
+    page: int = 1,
+    rows: int = 20,
 ) -> Dict[str, Any]:
     """
     Find accommodations in Korea by area.
@@ -217,6 +282,8 @@ async def find_accommodations(
         area_code: Area code (e.g., "1" for Seoul)
         sigungu_code: Sigungu (district) code within the area
         language: Language for results (e.g., "en", "jp", "zh-cn")
+        page: Page number for pagination (default: 1)
+        rows: Number of items per page (default: 20)
         
     Returns:
         A dictionary containing accommodation options in the specified area.
@@ -225,7 +292,9 @@ async def find_accommodations(
     results = await get_api_client().search_stay(
         area_code=area_code,
         sigungu_code=sigungu_code,
-        language=language
+        language=language,
+        page=page,
+        rows=rows
     )
     
     return {
@@ -252,13 +321,16 @@ async def get_detailed_information(
     Returns:
         A dictionary containing detailed information about the specified tourism item.
     """
-    # Convert human-readable content type to ID if provided
+    # Validate and convert content_type
     content_type_id = None
     if content_type:
         content_type_id = next(
             (k for k, v in CONTENTTYPE_ID_MAP.items() if v.lower() == content_type.lower()),
             None
         )
+        if content_type_id is None:
+            valid_types = ", ".join(CONTENTTYPE_ID_MAP.values())
+            raise ValueError(f"Invalid content_type: '{content_type}'. Valid types are: {valid_types}")
     
     # Get common details
     common_details = await get_api_client().get_detail_common(
@@ -302,6 +374,8 @@ async def get_detailed_information(
 async def get_tourism_images(
     content_id: str,
     language: str = None,
+    page: int = 1,
+    rows: int = 20,
 ) -> Dict[str, Any]:
     """
     Get images for a specific tourism item in Korea.
@@ -309,6 +383,8 @@ async def get_tourism_images(
     Args:
         content_id: Content ID of the tourism item
         language: Language for results (e.g., "en", "jp", "zh-cn")
+        page: Page number for pagination (default: 1)
+        rows: Number of items per page (default: 20)
         
     Returns:
         A dictionary containing images for the specified tourism item.
@@ -316,7 +392,9 @@ async def get_tourism_images(
     # Call the API client
     results = await get_api_client().get_detail_images(
         content_id=content_id,
-        language=language
+        language=language,
+        page=page,
+        rows=rows
     )
     
     return {
@@ -329,6 +407,8 @@ async def get_tourism_images(
 async def get_area_codes(
     parent_area_code: str = None,
     language: str = None,
+    page: int = 1,
+    rows: int = 100, # Area codes might be numerous, increase default rows
 ) -> Dict[str, Any]:
     """
     Get area codes for regions in Korea.
@@ -336,6 +416,8 @@ async def get_area_codes(
     Args:
         parent_area_code: Parent area code to get sub-areas (None for top-level areas)
         language: Language for results (e.g., "en", "jp", "zh-cn")
+        page: Page number for pagination (default: 1)
+        rows: Number of items per page (default: 100)
         
     Returns:
         A dictionary containing area codes and names.
@@ -343,7 +425,9 @@ async def get_area_codes(
     # Call the API client
     results = await get_api_client().get_area_code_list(
         area_code=parent_area_code,
-        language=language
+        language=language,
+        page=page,
+        rows=rows
     )
     
     return {
@@ -354,7 +438,6 @@ async def get_area_codes(
 
 if __name__ == "__main__":
     import sys
-    import traceback
     import asyncio
     
     # To avoid issues with "unhandled errors in TaskGroup", wrap everything in try-except
@@ -363,11 +446,32 @@ if __name__ == "__main__":
         # Just make sure to catch exceptions clearly
         try:
             mcp.run(transport="stdio")
+        except (KeyboardInterrupt, SystemExit):
+            logger.info("MCP server shutting down gracefully.")
         except Exception as e:
-            print(f"Error during MCP execution: {e}", file=sys.stderr)
-            traceback.print_exc()
+            logger.exception(f"Error during MCP execution: {e}") # Use logger.exception
             sys.exit(1)
     except Exception as e:
-        print(f"Error during MCP server setup: {e}", file=sys.stderr)
-        traceback.print_exc()
+        logger.exception(f"Error during MCP server setup: {e}") # Use logger.exception
         sys.exit(1)
+    finally:
+        # Attempt to close API client connections on exit
+        async def close_client():
+            global _api_client
+            if _api_client is not None:
+                logger.info("Closing API client connections...")
+                await KoreaTourismApiClient.close_all_connections()
+                logger.info("API client connections closed.")
+
+        # Run the cleanup in the current or a new event loop if needed
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                 # Schedule the cleanup task
+                 loop.create_task(close_client())
+            else:
+                 loop.run_until_complete(close_client())
+        except RuntimeError: # If no event loop exists
+            asyncio.run(close_client())
+        except Exception as cleanup_exc:
+             logger.error(f"Error during API client cleanup: {cleanup_exc}")
