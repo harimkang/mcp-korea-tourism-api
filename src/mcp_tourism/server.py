@@ -438,9 +438,7 @@ async def get_area_codes(
 
 if __name__ == "__main__":
     import sys
-    import traceback
     import asyncio
-    import signal # Import signal for handling termination
     
     # To avoid issues with "unhandled errors in TaskGroup", wrap everything in try-except
     try:

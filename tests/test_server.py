@@ -1,5 +1,4 @@
 import pytest
-import os
 from unittest.mock import patch, MagicMock
 from mcp_tourism.server import search_tourism_by_keyword, get_api_client, _api_client as server_api_client # Import necessary items
 from mcp_tourism.api_client import KoreaTourismApiClient
