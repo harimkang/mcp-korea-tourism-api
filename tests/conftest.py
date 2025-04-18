@@ -1,4 +1,3 @@
-import pytest
 import pytest_asyncio
 from mcp_tourism.api_client import KoreaTourismApiClient
 
