@@ -51,7 +51,7 @@ async def test_search_by_keyword_success(client: KoreaTourismApiClient):
     expected_params = {
         "MobileOS": "ETC", "MobileApp": "MobileApp", "numOfRows": "20",
         "pageNo": "1", "_type": "json", "keyword": keyword, "arrange": "Q",
-        "listYN": "Y", "contentTypeId": "", "areaCode": area_code
+        "listYN": "Y", "areaCode": area_code
     }
     encoded_params = urlencode(expected_params)
     expected_url = f"{client.BASE_URL}/{LANGUAGE_SERVICE_MAP[language]}{client.SEARCH_KEYWORD_ENDPOINT}?serviceKey={api_key_encoded}&{encoded_params}"
@@ -83,7 +83,7 @@ async def test_search_by_keyword_different_language(client: KoreaTourismApiClien
     expected_params = {
         "MobileOS": "ETC", "MobileApp": "MobileApp", "numOfRows": "20",
         "pageNo": "1", "_type": "json", "keyword": keyword, "arrange": "Q",
-        "listYN": "Y", "contentTypeId": ""
+        "listYN": "Y"
     }
     encoded_params = urlencode(expected_params)
     # Note the use of LANGUAGE_SERVICE_MAP['ko']
@@ -111,7 +111,7 @@ async def test_search_by_keyword_caching(client: KoreaTourismApiClient):
     expected_params = {
         "MobileOS": "ETC", "MobileApp": "MobileApp", "numOfRows": "20",
         "pageNo": "1", "_type": "json", "keyword": keyword, "arrange": "Q",
-        "listYN": "Y", "contentTypeId": ""
+        "listYN": "Y"
     }
     encoded_params = urlencode(expected_params)
     expected_url = f"{client.BASE_URL}/{LANGUAGE_SERVICE_MAP[language]}{client.SEARCH_KEYWORD_ENDPOINT}?serviceKey={api_key_encoded}&{encoded_params}"
@@ -139,7 +139,7 @@ async def test_api_error_handling(client: KoreaTourismApiClient):
     expected_params = {
         "MobileOS": "ETC", "MobileApp": "MobileApp", "numOfRows": "20",
         "pageNo": "1", "_type": "json", "keyword": keyword, "arrange": "Q",
-        "listYN": "Y", "contentTypeId": ""
+        "listYN": "Y"
     }
     encoded_params = urlencode(expected_params)
     expected_url = f"{client.BASE_URL}/{LANGUAGE_SERVICE_MAP[language]}{client.SEARCH_KEYWORD_ENDPOINT}?serviceKey={api_key_encoded}&{encoded_params}"
@@ -214,7 +214,8 @@ async def test_search_festival_success(client: KoreaTourismApiClient):
     expected_params = {
         "MobileOS": "ETC", "MobileApp": "MobileApp", "numOfRows": "20",
         "pageNo": "1", "_type": "json", "eventStartDate": start_date,
-        "eventEndDate": end_date, "areaCode": area_code
+        "eventEndDate": end_date, "areaCode": area_code,
+        "arrange": "Q", "listYN": "Y"
     }
     encoded_params = urlencode(expected_params)
     expected_url = f"{client.BASE_URL}/{LANGUAGE_SERVICE_MAP[language]}{client.SEARCH_FESTIVAL_ENDPOINT}?serviceKey={api_key_encoded}&{encoded_params}"
@@ -237,7 +238,8 @@ async def test_search_stay_success(client: KoreaTourismApiClient):
 
     expected_params = {
         "MobileOS": "ETC", "MobileApp": "MobileApp", "numOfRows": "20",
-        "pageNo": "1", "_type": "json", "areaCode": area_code, "sigunguCode": sigungu_code
+        "pageNo": "1", "_type": "json", "areaCode": area_code, "sigunguCode": sigungu_code,
+        "arrange": "Q", "listYN": "Y"
     }
     encoded_params = urlencode(expected_params)
     expected_url = f"{client.BASE_URL}/{LANGUAGE_SERVICE_MAP[language]}{client.SEARCH_STAY_ENDPOINT}?serviceKey={api_key_encoded}&{encoded_params}"
@@ -419,7 +421,7 @@ async def test_search_by_keyword_with_sigungu(client: KoreaTourismApiClient):
     expected_params = {
         "MobileOS": "ETC", "MobileApp": "MobileApp", "numOfRows": "20",
         "pageNo": "1", "_type": "json", "keyword": keyword, "arrange": "Q",
-        "listYN": "Y", "contentTypeId": "", "areaCode": area_code, "sigunguCode": sigungu_code
+        "listYN": "Y", "areaCode": area_code, "sigunguCode": sigungu_code
     }
     encoded_params = urlencode(expected_params)
     expected_url = f"{client.BASE_URL}/{LANGUAGE_SERVICE_MAP[language]}{client.SEARCH_KEYWORD_ENDPOINT}?serviceKey={api_key_encoded}&{encoded_params}"
