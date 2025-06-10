@@ -1,21 +1,21 @@
 # server.py
 import os
 from typing import Dict, Any, Optional
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from mcp_tourism.api_client import KoreaTourismApiClient, CONTENTTYPE_ID_MAP
-import logging # Import logging
+import logging
 
 # Create an MCP server
 mcp = FastMCP(
     name="Korea Tourism API",
     description="API for Korea Tourism information",
-    version="0.1.2", # Increment version for changes
+    version="0.1.2",
     dependencies=["httpx", "cachetools", "tenacity", "ratelimit"],
 )
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__) # Get logger for server module
+logger = logging.getLogger(__name__)
 
 # Lazy initialization of the API client
 _api_client: Optional[KoreaTourismApiClient] = None
@@ -71,12 +71,11 @@ def get_api_client() -> KoreaTourismApiClient:
 
 # MCP Tools for Korea Tourism API
 
-@mcp.tool()
 async def search_tourism_by_keyword(
     keyword: str,
-    content_type: str = None,
-    area_code: str = None,
-    language: str = None,
+    content_type: str | None = None,
+    area_code: str | None = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
 ) -> Dict[str, Any]:
@@ -119,12 +118,11 @@ async def search_tourism_by_keyword(
     )
 
 
-@mcp.tool()
 async def get_tourism_by_area(
     area_code: str,
-    sigungu_code: str = None,
-    content_type: str = None,
-    language: str = None,
+    sigungu_code: str | None = None,
+    content_type: str | None = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
 ) -> Dict[str, Any]:
@@ -170,13 +168,12 @@ async def get_tourism_by_area(
         "num_of_rows": results.get("num_of_rows", 0)
     }
 
-@mcp.tool()
 async def find_nearby_attractions(
     longitude: float,
     latitude: float,
     radius: int = 1000,
-    content_type: str = None,
-    language: str = None,
+    content_type: str | None = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
 ) -> Dict[str, Any]:
@@ -225,12 +222,11 @@ async def find_nearby_attractions(
         "search_radius": radius
     }
 
-@mcp.tool()
 async def search_festivals_by_date(
     start_date: str,
-    end_date: str = None,
-    area_code: str = None,
-    language: str = None,
+    end_date: str | None = None,
+    area_code: str | None = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
 ) -> Dict[str, Any]:
@@ -267,11 +263,10 @@ async def search_festivals_by_date(
         "end_date": end_date or "ongoing"
     }
 
-@mcp.tool()
 async def find_accommodations(
-    area_code: str = None,
-    sigungu_code: str = None,
-    language: str = None,
+    area_code: str | None = None,
+    sigungu_code: str | None = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
 ) -> Dict[str, Any]:
@@ -304,11 +299,10 @@ async def find_accommodations(
         "num_of_rows": results.get("num_of_rows", 0)
     }
 
-@mcp.tool()
 async def get_detailed_information(
     content_id: str,
-    content_type: str = None,
-    language: str = None,
+    content_type: str | None = None,
+    language: str | None = None,
 ) -> Dict[str, Any]:
     """
     Get detailed information about a specific tourism item in Korea.
@@ -370,10 +364,9 @@ async def get_detailed_information(
         **additional_details
     }
 
-@mcp.tool()
 async def get_tourism_images(
     content_id: str,
-    language: str = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
 ) -> Dict[str, Any]:
@@ -403,12 +396,11 @@ async def get_tourism_images(
         "content_id": content_id
     }
 
-@mcp.tool()
 async def get_area_codes(
-    parent_area_code: str = None,
-    language: str = None,
+    parent_area_code: str | None = None,
+    language: str | None = None,
     page: int = 1,
-    rows: int = 100, # Area codes might be numerous, increase default rows
+    rows: int = 100,
 ) -> Dict[str, Any]:
     """
     Get area codes for regions in Korea.
@@ -436,42 +428,16 @@ async def get_area_codes(
         "parent_area_code": parent_area_code
     }
 
-if __name__ == "__main__":
-    import sys
-    import asyncio
-    
-    # To avoid issues with "unhandled errors in TaskGroup", wrap everything in try-except
-    try:
-        # Use FastMCP's run method which should already handle asyncio event loop
-        # Just make sure to catch exceptions clearly
-        try:
-            mcp.run(transport="stdio")
-        except (KeyboardInterrupt, SystemExit):
-            logger.info("MCP server shutting down gracefully.")
-        except Exception as e:
-            logger.exception(f"Error during MCP execution: {e}") # Use logger.exception
-            sys.exit(1)
-    except Exception as e:
-        logger.exception(f"Error during MCP server setup: {e}") # Use logger.exception
-        sys.exit(1)
-    finally:
-        # Attempt to close API client connections on exit
-        async def close_client():
-            global _api_client
-            if _api_client is not None:
-                logger.info("Closing API client connections...")
-                await KoreaTourismApiClient.close_all_connections()
-                logger.info("API client connections closed.")
+# Register functions as MCP tools
+mcp.tool(search_tourism_by_keyword)
+mcp.tool(get_tourism_by_area)
+mcp.tool(find_nearby_attractions)
+mcp.tool(search_festivals_by_date)
+mcp.tool(find_accommodations)
+mcp.tool(get_detailed_information)
+mcp.tool(get_tourism_images)
+mcp.tool(get_area_codes)
 
-        # Run the cleanup in the current or a new event loop if needed
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                 # Schedule the cleanup task
-                 loop.create_task(close_client())
-            else:
-                 loop.run_until_complete(close_client())
-        except RuntimeError: # If no event loop exists
-            asyncio.run(close_client())
-        except Exception as cleanup_exc:
-             logger.error(f"Error during API client cleanup: {cleanup_exc}")
+if __name__ == "__main__":
+    # Use FastMCP's simplified run method
+    mcp.run()

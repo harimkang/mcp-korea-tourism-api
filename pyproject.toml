@@ -20,8 +20,8 @@ classifiers = [
 ]
 dependencies = [
     "cachetools>=5.5.2",
+    "fastmcp>=2.7.1",
     "httpx>=0.28.1",
-    "mcp[cli]>=1.6.0",
     "ratelimit>=2.2.1",
     "tenacity>=9.1.2",
 ]
