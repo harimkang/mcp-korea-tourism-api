@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from mcp_tourism.server import search_tourism_by_keyword, get_api_client, _api_client as server_api_client # Import necessary items
+from fastmcp import Client
+from mcp_tourism.server import mcp, get_api_client, _api_client as server_api_client # Import necessary items
 from mcp_tourism.api_client import KoreaTourismApiClient
 
 # Fixture to reset the global API client before each test that needs it
@@ -17,26 +18,39 @@ def mock_api_client():
     return mock_client
 
 @pytest.mark.asyncio
-# Patch get_api_client to return our mock client instead of initializing a real one
 @patch('mcp_tourism.server.get_api_client')
-async def test_search_tourism_invalid_content_type(mock_get_api_client, mock_api_client):
+async def test_search_tourism_invalid_content_type(mock_get_api_client, mock_api_client, monkeypatch):
     """
     Test that search_tourism_by_keyword raises ValueError for invalid content_type.
     """
+    # Set up environment variables for testing
+    monkeypatch.setenv("KOREA_TOURISM_API_KEY", "test-api-key-12345")
+    
     # Configure the mock get_api_client to return our fixture mock_api_client
     mock_get_api_client.return_value = mock_api_client
     
     invalid_type = "InvalidContentType"
     keyword = "Test"
 
-    with pytest.raises(ValueError) as excinfo:
-        await search_tourism_by_keyword(keyword=keyword, content_type=invalid_type)
+    # Create a client connected to our server
+    client = Client(mcp)
+    
+    async with client:
+        # Call the search tool with invalid content_type
+        with pytest.raises(Exception) as excinfo:
+            await client.call_tool(
+                "search_tourism_by_keyword",
+                {
+                    "keyword": keyword,
+                    "content_type": invalid_type
+                }
+            )
 
-    # Check that the error message contains the invalid type and mentions valid types
-    assert invalid_type in str(excinfo.value)
-    assert "Valid types are:" in str(excinfo.value)
-    # Ensure the underlying client method was NOT called
-    mock_api_client.search_by_keyword.assert_not_called()
+        # Check that the error message contains the invalid type and mentions valid types
+        assert invalid_type in str(excinfo.value)
+        assert "Valid types are:" in str(excinfo.value)
+        # Ensure the underlying client method was NOT called
+        mock_api_client.search_by_keyword.assert_not_called()
 
 @pytest.mark.parametrize(
     "env_var, invalid_value",

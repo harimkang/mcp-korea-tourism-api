@@ -1,8 +1,9 @@
 import httpx
 import logging
 import asyncio
-import urllib
+import urllib.parse
 import json
+import codecs
 from typing import Dict, Optional, Any, Literal, ClassVar
 from cachetools import TTLCache
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -32,6 +33,31 @@ LANGUAGE_SERVICE_MAP = {
     "es": "SpnService1",   # Spanish
     "ru": "RusService1",   # Russian
 }
+
+def decode_unicode_escapes(obj: Any) -> Any:
+    """
+    Recursively decode unicode escape sequences in strings within data structures.
+    This helps resolve Korean character encoding issues like \\uc11c\\uc6b8 -> 서울.
+    Only processes strings that actually contain unicode escape sequences.
+    """
+    if isinstance(obj, str):
+        # Only attempt decoding if the string contains unicode escape sequences
+        if '\\u' in obj:
+            try:
+                # Try to decode unicode escape sequences (e.g., \\uc11c\\uc6b8 -> 서울)
+                return codecs.decode(obj, 'unicode_escape')
+            except (UnicodeDecodeError, ValueError):
+                # If decoding fails, return original string
+                return obj
+        else:
+            # If no escape sequences, return as-is
+            return obj
+    elif isinstance(obj, dict):
+        return {key: decode_unicode_escapes(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [decode_unicode_escapes(item) for item in obj]
+    else:
+        return obj
 
 class TourismApiError(Exception):
     """Base exception for Tourism API errors"""
@@ -158,6 +184,7 @@ class KoreaTourismApiClient:
 
         # Store configuration parameters
         self.default_language = language.lower()
+        self.language: Optional[str] = None  # Initialize language attribute
         self._cache_ttl = cache_ttl
         self._rate_limit_calls = rate_limit_calls
         self._rate_limit_period = rate_limit_period
@@ -176,10 +203,10 @@ class KoreaTourismApiClient:
         if self._is_fully_initialized:
             return
 
-        # Get logger
+        # Get logger first
         self.logger = logging.getLogger(self._logger_name)
         if not self.logger.hasHandlers(): # Basic check to prevent duplicate handlers if called multiple times
-             logging.basicConfig(level=logging.INFO) # Basic config if not already set
+            logging.basicConfig(level=logging.INFO) # Basic config if not already set
 
         # Validate API key presence here before proceeding
         if not self.api_key or self.api_key == "missing_api_key":
@@ -205,10 +232,10 @@ class KoreaTourismApiClient:
         self._is_fully_initialized = True
 
     @property
-    def cache(self):
+    def cache(self) -> TTLCache:
         """Lazy cache initialization"""
         self._ensure_full_initialization()
-        return self._cache
+        return self._cache  # type: ignore  # We know it's initialized after _ensure_full_initialization
     
     @classmethod
     async def get_shared_client(cls) -> httpx.AsyncClient:
@@ -273,18 +300,15 @@ class KoreaTourismApiClient:
         """Make a request to the API with caching, rate limiting, and language override."""
         # Ensure all initialization is completed
         self._ensure_full_initialization()
-        # Check logger and semaphore are initialized
-        if self.logger is None or self._request_semaphore is None:
-             raise RuntimeError("Client not fully initialized. Logger or semaphore missing.")
+        # After initialization, these are guaranteed to be not None
+        assert self._request_semaphore is not None
 
         # Determine the language and base URL for this specific request
-        request_language = self.language
+        request_language = self.language or "en"  # Fallback to English if None
         if language_override:
             lang_lower = language_override.lower()
             if lang_lower in LANGUAGE_SERVICE_MAP:
                 request_language = lang_lower
-            else:
-                 self.logger.warning(f"Unsupported language override: {language_override}. Falling back to client default: {self.language}.")
         
         request_service_name = LANGUAGE_SERVICE_MAP[request_language]
         request_full_base_url = f"{self.BASE_URL}/{request_service_name}"
@@ -294,95 +318,95 @@ class KoreaTourismApiClient:
             cache_key = self._get_cache_key(endpoint, params, request_language)
             cached_response = self.cache.get(cache_key)
             if cached_response:
-                self.logger.debug(f"Cache hit for {cache_key}")
                 return cached_response
 
         # Apply rate limiting dynamically here using instance attributes
         @sleep_and_retry
         @limits(calls=self._rate_limit_calls, period=self._rate_limit_period)
-        async def rate_limited_request():
-             # Use concurrency semaphore to limit simultaneous requests
-             async with self._request_semaphore: # Use the instance semaphore
-                 # Add common parameters using constants
-                 full_params = {
-                     "MobileOS": self.MOBILE_OS,
-                     "MobileApp": self.MOBILE_APP,
-                     # Defaults like numOfRows/pageNo are better set by calling methods or API defaults
-                     "_type": self.RESPONSE_FORMAT,
-                     **params
-                 }
-                 
-                 # API key handling remains the same for now
-                 serviceKey = self.api_key # Already validated in _ensure_full_initialization
-                 
-                 # Build the full URL with the determined service for this request
-                 url = f"{request_full_base_url}{endpoint}"
-                 
-                 client = await self.get_shared_client()
-                 
-                 # First, encode the parameters
-                 encoded_params = urllib.parse.urlencode(full_params)
-                 
-                 # Then append the already-encoded service key
-                 full_url = f"{url}?serviceKey={serviceKey}&{encoded_params}"
-                 
-                 self.logger.debug(f"Making request to URL: {full_url}")
-                 response = await client.get(full_url)
-                 
-                 self._process_response_error(response)
-                 
-                 # Parse the response with better error handling
-                 try:
-                     # Check if the response has content
-                     if not response.content or len(response.content.strip()) == 0:
-                         self.logger.error("Empty response received from tourism API")
-                         raise TourismApiError("Empty response received from tourism API")
-                     
-                     result = response.json()
-                 except json.JSONDecodeError as e:
-                     self.logger.error(f"Failed to parse JSON response: {e}. Response content: {response.text[:200]}")
-                     raise TourismApiError(f"Invalid JSON response: {str(e)}")
-                 
-                 # Extract the items from the nested response structure
-                 try:
-                     response_header = result["response"]["header"]
-                     response_body = result["response"]["body"]
-                     
-                     result_code = response_header.get("resultCode")
-                     if result_code != "0000":
-                         raise TourismApiError(f"API error: {response_header.get('resultMsg', 'Unknown error')}")
-                     
-                     total_count = response_body.get("totalCount", 0)
-                     items = []
-                     
-                     if total_count > 0:
-                         items_container = response_body.get("items", {})
-                         if "item" in items_container:
-                             items = items_container["item"]
-                             if not isinstance(items, list):
-                                 items = [items]  # Ensure items is a list even if there's only one result
-                     
-                     # Structure the results
-                     result_data = {
-                         "total_count": total_count,
-                         "num_of_rows": response_body.get("numOfRows", 0),
-                         "page_no": response_body.get("pageNo", 1),
-                         "items": items
-                     }
-                     
-                     # Cache the response if caching is enabled, using the request-specific language
-                     if use_cache:
-                         cache_key = self._get_cache_key(endpoint, params, request_language)
-                         self.cache[cache_key] = result_data # Use property access for cache
-                     
-                     return result_data
-                     
-                 except (KeyError, TypeError) as e:
-                     self.logger.error(f"Error parsing Tourism API response: {e}")
-                     raise TourismApiError(f"Failed to parse API response: {e}")
+        async def rate_limited_request() -> Dict[str, Any]:
+            # Use concurrency semaphore to limit simultaneous requests
+            semaphore = self._request_semaphore
+            assert semaphore is not None, "Semaphore should be initialized"
+            async with semaphore:
+                # Add common parameters using constants
+                full_params = {
+                    "MobileOS": self.MOBILE_OS,
+                    "MobileApp": self.MOBILE_APP,
+                    # Defaults like numOfRows/pageNo are better set by calling methods or API defaults
+                    "_type": self.RESPONSE_FORMAT,
+                    **params
+                }
+                
+                # API key handling remains the same for now
+                serviceKey = self.api_key # Already validated in _ensure_full_initialization
+                
+                # Build the full URL with the determined service for this request
+                url = f"{request_full_base_url}{endpoint}"
+                
+                client = await self.get_shared_client()
+                
+                # First, encode the parameters
+                encoded_params = urllib.parse.urlencode(full_params)
+                
+                # Then append the already-encoded service key
+                full_url = f"{url}?serviceKey={serviceKey}&{encoded_params}"
+                response = await client.get(full_url)
+                
+                self._process_response_error(response)
+                
+                # Parse the response with better error handling
+                try:
+                    # Check if the response has content
+                    if not response.content or len(response.content.strip()) == 0:
+                        raise TourismApiError("Empty response received from tourism API")
+                    
+                    result = response.json()
+                except json.JSONDecodeError as e:
+                    raise TourismApiError(f"Invalid JSON response: {str(e)}")
+                
+                # Extract the items from the nested response structure
+                try:
+                    response_header = result["response"]["header"]
+                    response_body = result["response"]["body"]
+                    
+                    result_code = response_header.get("resultCode")
+                    if result_code != "0000":
+                        raise TourismApiError(f"API error: {response_header.get('resultMsg', 'Unknown error')}")
+                    
+                    total_count = response_body.get("totalCount", 0)
+                    items = []
+                    
+                    if total_count > 0:
+                        items_container = response_body.get("items", {})
+                        if "item" in items_container:
+                            items = items_container["item"]
+                            if not isinstance(items, list):
+                                items = [items]  # Ensure items is a list even if there's only one result
+                    
+                    # Structure the results
+                    result_data = {
+                        "total_count": total_count,
+                        "num_of_rows": response_body.get("numOfRows", 0),
+                        "page_no": response_body.get("pageNo", 1),
+                        "items": items
+                    }
+                    
+                    # Apply unicode decoding to handle Korean character encoding issues
+                    result_data = decode_unicode_escapes(result_data)
+                    
+                    # Cache the response if caching is enabled, using the request-specific language
+                    if use_cache:
+                        cache_key = self._get_cache_key(endpoint, params, request_language)
+                        self.cache[cache_key] = result_data
+                    
+                    return result_data
+                    
+                except (KeyError, TypeError) as e:
+                    raise TourismApiError(f"Failed to parse API response: {e}")
 
         # Call the inner function that has the decorators applied
-        return await rate_limited_request()
+        result = rate_limited_request()
+        return await result  # type: ignore[misc]
 
     async def search_by_keyword(
         self,
@@ -457,7 +481,7 @@ class KoreaTourismApiClient:
         }
 
         if content_type_id:
-             params["contentTypeId"] = content_type_id
+            params["contentTypeId"] = content_type_id
 
         if area_code:
             params["areaCode"] = area_code
@@ -633,12 +657,9 @@ class KoreaTourismApiClient:
             # Ensure radius is a positive integer
             radius_int = int(radius)
             if radius_int <= 0:
-                 raise ValueError("radius must be a positive integer")
+                raise ValueError("radius must be a positive integer")
         except ValueError:
-             raise ValueError("radius must be a valid integer")
-        # Basic type check for coordinates (can be enhanced)
-        if not isinstance(mapx, (float, int)) or not isinstance(mapy, (float, int)):
-             self.logger.warning("mapx and mapy should ideally be floats or integers.")
+            raise ValueError("radius must be a valid integer")
 
         params: Dict[str, Any] = {
             "listYN": self.LIST_YN_YES,
@@ -717,9 +738,9 @@ class KoreaTourismApiClient:
             raise ValueError("event_start_date (YYYYMMDD) is required")
         # Basic format check (can be improved with regex)
         if not (isinstance(event_start_date, str) and len(event_start_date) == 8 and event_start_date.isdigit()):
-             raise ValueError("event_start_date must be in YYYYMMDD format")
+            raise ValueError("event_start_date must be in YYYYMMDD format")
         if event_end_date and not (isinstance(event_end_date, str) and len(event_end_date) == 8 and event_end_date.isdigit()):
-             raise ValueError("event_end_date must be in YYYYMMDD format")
+            raise ValueError("event_end_date must be in YYYYMMDD format")
 
         params: Dict[str, Any] = {
             "eventStartDate": event_start_date,
@@ -1040,10 +1061,9 @@ class KoreaTourismApiClient:
             Note: The actual fields returned depend on the content_type_id and will vary between different types of tourism items.
         """
         if not content_id:
-             raise ValueError("content_id is required")
+            raise ValueError("content_id is required")
         if not content_type_id:
-             raise ValueError("content_type_id is required")
-             
+            raise ValueError("content_type_id is required")
         params: Dict[str, Any] = {
             "contentId": content_id,
             "contentTypeId": content_type_id,
@@ -1098,10 +1118,10 @@ class KoreaTourismApiClient:
             Note: Each item in the 'items' list represents a specific piece of additional information about the tourism item.
         """
         if not content_id:
-             raise ValueError("content_id is required")
+            raise ValueError("content_id is required")
         if not content_type_id:
-             raise ValueError("content_type_id is required")
-             
+            raise ValueError("content_type_id is required")
+
         params: Dict[str, Any] = {
             "contentId": content_id,
             "contentTypeId": content_type_id,

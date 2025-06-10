@@ -3,17 +3,20 @@ import os
 import atexit
 import signal
 import asyncio
+import json
 from typing import Dict, Any, Optional
 from fastmcp import FastMCP
+from mcp.types import EmbeddedResource, TextResourceContents
 from mcp_tourism.api_client import KoreaTourismApiClient, CONTENTTYPE_ID_MAP
 import logging
+
 
 # Create an MCP server
 mcp = FastMCP(
     name="Korea Tourism API",
     description="API for Korea Tourism information",
-    version="0.1.2",
-    dependencies=["httpx", "cachetools", "tenacity", "ratelimit"],
+    version="0.1.3",
+    dependencies=["httpx", "cachetools", "tenacity", "ratelimit"]
 )
 
 # Configure basic logging
@@ -67,9 +70,9 @@ def get_api_client() -> KoreaTourismApiClient:
             _api_client._ensure_full_initialization()
             logger.info("KoreaTourismApiClient initialized successfully.")
         except ValueError as e:
-             logger.error(f"Failed to initialize KoreaTourismApiClient: {e}")
-             # Propagate the error so the MCP tool call fails clearly
-             raise
+            logger.error(f"Failed to initialize KoreaTourismApiClient: {e}")
+            # Propagate the error so the MCP tool call fails clearly
+            raise
     return _api_client
 
 # Resource cleanup functions
@@ -131,7 +134,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
 # MCP Tools for Korea Tourism API
-
+@mcp.tool
 async def search_tourism_by_keyword(
     keyword: str,
     content_type: str | None = None,
@@ -139,7 +142,7 @@ async def search_tourism_by_keyword(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Search for tourism information in Korea by keyword.
     
@@ -169,7 +172,7 @@ async def search_tourism_by_keyword(
             raise ValueError(f"Invalid content_type: '{content_type}'. Valid types are: {valid_types}")
     
     # Call the API client
-    return await client.search_by_keyword(
+    result = await client.search_by_keyword(
         keyword=keyword,
         content_type_id=content_type_id,
         area_code=area_code,
@@ -177,8 +180,18 @@ async def search_tourism_by_keyword(
         page=page,
         rows=rows
     )
+    
+    # Return as EmbeddedResource to solve response format issue
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://search/{keyword}",
+            mimeType="application/json",
+            text=json.dumps(result, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
-
+@mcp.tool
 async def get_tourism_by_area(
     area_code: str,
     sigungu_code: str | None = None,
@@ -186,7 +199,7 @@ async def get_tourism_by_area(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Browse tourism information by geographic areas in Korea.
     
@@ -222,13 +235,25 @@ async def get_tourism_by_area(
         rows=rows
     )
     
-    return {
+    # Prepare result data
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "page_no": results.get("page_no", 1),
         "num_of_rows": results.get("num_of_rows", 0)
     }
+    
+    # Return as EmbeddedResource to solve response format issue
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://area/{area_code}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
+@mcp.tool
 async def find_nearby_attractions(
     longitude: float,
     latitude: float,
@@ -237,7 +262,7 @@ async def find_nearby_attractions(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Find tourism attractions near a specific location in Korea.
     
@@ -275,14 +300,24 @@ async def find_nearby_attractions(
         rows=rows
     )
     
-    return {
+    
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "page_no": results.get("page_no", 1),
         "num_of_rows": results.get("num_of_rows", 0),
         "search_radius": radius
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://nearby/{longitude}/{latitude}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
+@mcp.tool
 async def search_festivals_by_date(
     start_date: str,
     end_date: str | None = None,
@@ -290,7 +325,7 @@ async def search_festivals_by_date(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Find festivals in Korea by date range.
     
@@ -315,7 +350,7 @@ async def search_festivals_by_date(
         rows=rows
     )
     
-    return {
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "page_no": results.get("page_no", 1),
@@ -323,14 +358,23 @@ async def search_festivals_by_date(
         "start_date": start_date,
         "end_date": end_date or "ongoing"
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://festival/{start_date}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
+@mcp.tool
 async def find_accommodations(
     area_code: str | None = None,
     sigungu_code: str | None = None,
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Find accommodations in Korea by area.
     
@@ -353,18 +397,27 @@ async def find_accommodations(
         rows=rows
     )
     
-    return {
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "page_no": results.get("page_no", 1),
         "num_of_rows": results.get("num_of_rows", 0)
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://accommodation/{area_code}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
+@mcp.tool
 async def get_detailed_information(
     content_id: str,
     content_type: str | None = None,
     language: str | None = None,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Get detailed information about a specific tourism item in Korea.
     
@@ -419,18 +472,27 @@ async def get_detailed_information(
     
     # Combine all details
     item = common_details.get("items", [{}])[0] if common_details.get("items") else {}
-    return {
+    result_data = {
         **item,
         **intro_details,
         **additional_details
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://detail/{content_id}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
+@mcp.tool
 async def get_tourism_images(
     content_id: str,
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Get images for a specific tourism item in Korea.
     
@@ -451,18 +513,27 @@ async def get_tourism_images(
         rows=rows
     )
     
-    return {
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "content_id": content_id
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://images/{content_id}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
+@mcp.tool
 async def get_area_codes(
     parent_area_code: str | None = None,
     language: str | None = None,
     page: int = 1,
     rows: int = 100,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Get area codes for regions in Korea.
     
@@ -483,21 +554,20 @@ async def get_area_codes(
         rows=rows
     )
     
-    return {
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "parent_area_code": parent_area_code
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri="korea-tourism://area-codes",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
-# Register functions as MCP tools
-mcp.tool(search_tourism_by_keyword)
-mcp.tool(get_tourism_by_area)
-mcp.tool(find_nearby_attractions)
-mcp.tool(search_festivals_by_date)
-mcp.tool(find_accommodations)
-mcp.tool(get_detailed_information)
-mcp.tool(get_tourism_images)
-mcp.tool(get_area_codes)
 
 if __name__ == "__main__":
     # Use FastMCP's simplified run method

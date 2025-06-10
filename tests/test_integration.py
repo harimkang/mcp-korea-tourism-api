@@ -108,8 +108,8 @@ async def test_search_tourism_tool_execution(mock_get_api_client, mock_api_clien
         # Verify we got a result
         assert len(result) > 0
         
-        # The result should be TextContent with JSON data
-        assert result[0].type == "text"
+        # The result should be EmbeddedResource with JSON data
+        assert result[0].type == "resource"
         
         # Verify the mock was called correctly
         mock_api_client.search_by_keyword.assert_called_once_with(
