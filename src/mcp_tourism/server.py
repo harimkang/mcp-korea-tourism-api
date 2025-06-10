@@ -1,5 +1,8 @@
 # server.py
 import os
+import atexit
+import signal
+import asyncio
 from typing import Dict, Any, Optional
 from fastmcp import FastMCP
 from mcp_tourism.api_client import KoreaTourismApiClient, CONTENTTYPE_ID_MAP
@@ -68,6 +71,64 @@ def get_api_client() -> KoreaTourismApiClient:
              # Propagate the error so the MCP tool call fails clearly
              raise
     return _api_client
+
+# Resource cleanup functions
+def cleanup_resources():
+    """
+    Clean up resources when the server shuts down.
+    This function is called by atexit and signal handlers.
+    """
+    logger.info("Cleaning up resources...")
+    try:
+        # Try to get the current event loop
+        try:
+            loop = asyncio.get_event_loop()
+            # Check if the loop is closed
+            if loop.is_closed():
+                logger.info("Event loop is already closed, skipping async cleanup")
+                return
+        except RuntimeError:
+            # No event loop exists - this is common during process shutdown
+            logger.info("No event loop available, creating temporary loop for cleanup")
+            try:
+                # Create a temporary event loop for cleanup
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(KoreaTourismApiClient.close_all_connections())
+                    logger.info("Resources cleaned up successfully.")
+                finally:
+                    loop.close()
+                return
+            except Exception as temp_loop_error:
+                logger.warning(f"Temporary loop cleanup failed: {temp_loop_error}")
+                logger.info("Skipping resource cleanup - connections will be closed by OS")
+                return
+        
+        if loop.is_running():
+            # If we're in a running event loop, schedule the cleanup
+            # Note: This scenario is tricky - we can't wait for completion
+            logger.warning("Event loop is running, scheduling cleanup task")
+            loop.create_task(KoreaTourismApiClient.close_all_connections())
+        else:
+            # Loop exists and is not running, safe to run_until_complete
+            loop.run_until_complete(KoreaTourismApiClient.close_all_connections())
+            
+        logger.info("Resources cleaned up successfully.")
+    except Exception as e:
+        logger.warning(f"Resource cleanup failed: {e}")
+        logger.info("Connections will be closed automatically by the operating system")
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    logger.info(f"Received signal {signum}, shutting down gracefully...")
+    cleanup_resources()
+    os._exit(0)
+
+# Register cleanup handlers
+atexit.register(cleanup_resources)
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 
 # MCP Tools for Korea Tourism API
 
