@@ -1,21 +1,27 @@
 # server.py
 import os
+import atexit
+import signal
+import asyncio
+import json
 from typing import Dict, Any, Optional
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
+from mcp.types import EmbeddedResource, TextResourceContents
 from mcp_tourism.api_client import KoreaTourismApiClient, CONTENTTYPE_ID_MAP
-import logging # Import logging
+import logging
+
 
 # Create an MCP server
 mcp = FastMCP(
     name="Korea Tourism API",
     description="API for Korea Tourism information",
-    version="0.1.2", # Increment version for changes
-    dependencies=["httpx", "cachetools", "tenacity", "ratelimit"],
+    version="0.1.3",
+    dependencies=["httpx", "cachetools", "tenacity", "ratelimit"]
 )
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__) # Get logger for server module
+logger = logging.getLogger(__name__)
 
 # Lazy initialization of the API client
 _api_client: Optional[KoreaTourismApiClient] = None
@@ -64,22 +70,79 @@ def get_api_client() -> KoreaTourismApiClient:
             _api_client._ensure_full_initialization()
             logger.info("KoreaTourismApiClient initialized successfully.")
         except ValueError as e:
-             logger.error(f"Failed to initialize KoreaTourismApiClient: {e}")
-             # Propagate the error so the MCP tool call fails clearly
-             raise
+            logger.error(f"Failed to initialize KoreaTourismApiClient: {e}")
+            # Propagate the error so the MCP tool call fails clearly
+            raise
     return _api_client
 
-# MCP Tools for Korea Tourism API
+# Resource cleanup functions
+def cleanup_resources():
+    """
+    Clean up resources when the server shuts down.
+    This function is called by atexit and signal handlers.
+    """
+    logger.info("Cleaning up resources...")
+    try:
+        # Try to get the current event loop
+        try:
+            loop = asyncio.get_event_loop()
+            # Check if the loop is closed
+            if loop.is_closed():
+                logger.info("Event loop is already closed, skipping async cleanup")
+                return
+        except RuntimeError:
+            # No event loop exists - this is common during process shutdown
+            logger.info("No event loop available, creating temporary loop for cleanup")
+            try:
+                # Create a temporary event loop for cleanup
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(KoreaTourismApiClient.close_all_connections())
+                    logger.info("Resources cleaned up successfully.")
+                finally:
+                    loop.close()
+                return
+            except Exception as temp_loop_error:
+                logger.warning(f"Temporary loop cleanup failed: {temp_loop_error}")
+                logger.info("Skipping resource cleanup - connections will be closed by OS")
+                return
+        
+        if loop.is_running():
+            # If we're in a running event loop, schedule the cleanup
+            # Note: This scenario is tricky - we can't wait for completion
+            logger.warning("Event loop is running, scheduling cleanup task")
+            loop.create_task(KoreaTourismApiClient.close_all_connections())
+        else:
+            # Loop exists and is not running, safe to run_until_complete
+            loop.run_until_complete(KoreaTourismApiClient.close_all_connections())
+            
+        logger.info("Resources cleaned up successfully.")
+    except Exception as e:
+        logger.warning(f"Resource cleanup failed: {e}")
+        logger.info("Connections will be closed automatically by the operating system")
 
-@mcp.tool()
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    logger.info(f"Received signal {signum}, shutting down gracefully...")
+    cleanup_resources()
+    os._exit(0)
+
+# Register cleanup handlers
+atexit.register(cleanup_resources)
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
+
+# MCP Tools for Korea Tourism API
+@mcp.tool
 async def search_tourism_by_keyword(
     keyword: str,
-    content_type: str = None,
-    area_code: str = None,
-    language: str = None,
+    content_type: str | None = None,
+    area_code: str | None = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Search for tourism information in Korea by keyword.
     
@@ -109,7 +172,7 @@ async def search_tourism_by_keyword(
             raise ValueError(f"Invalid content_type: '{content_type}'. Valid types are: {valid_types}")
     
     # Call the API client
-    return await client.search_by_keyword(
+    result = await client.search_by_keyword(
         keyword=keyword,
         content_type_id=content_type_id,
         area_code=area_code,
@@ -117,17 +180,26 @@ async def search_tourism_by_keyword(
         page=page,
         rows=rows
     )
+    
+    # Return as EmbeddedResource to solve response format issue
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://search/{keyword}",
+            mimeType="application/json",
+            text=json.dumps(result, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
-
-@mcp.tool()
+@mcp.tool
 async def get_tourism_by_area(
     area_code: str,
-    sigungu_code: str = None,
-    content_type: str = None,
-    language: str = None,
+    sigungu_code: str | None = None,
+    content_type: str | None = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Browse tourism information by geographic areas in Korea.
     
@@ -163,23 +235,34 @@ async def get_tourism_by_area(
         rows=rows
     )
     
-    return {
+    # Prepare result data
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "page_no": results.get("page_no", 1),
         "num_of_rows": results.get("num_of_rows", 0)
     }
+    
+    # Return as EmbeddedResource to solve response format issue
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://area/{area_code}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
-@mcp.tool()
+@mcp.tool
 async def find_nearby_attractions(
     longitude: float,
     latitude: float,
     radius: int = 1000,
-    content_type: str = None,
-    language: str = None,
+    content_type: str | None = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Find tourism attractions near a specific location in Korea.
     
@@ -217,23 +300,32 @@ async def find_nearby_attractions(
         rows=rows
     )
     
-    return {
+    
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "page_no": results.get("page_no", 1),
         "num_of_rows": results.get("num_of_rows", 0),
         "search_radius": radius
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://nearby/{longitude}/{latitude}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
-@mcp.tool()
+@mcp.tool
 async def search_festivals_by_date(
     start_date: str,
-    end_date: str = None,
-    area_code: str = None,
-    language: str = None,
+    end_date: str | None = None,
+    area_code: str | None = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Find festivals in Korea by date range.
     
@@ -258,7 +350,7 @@ async def search_festivals_by_date(
         rows=rows
     )
     
-    return {
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "page_no": results.get("page_no", 1),
@@ -266,15 +358,23 @@ async def search_festivals_by_date(
         "start_date": start_date,
         "end_date": end_date or "ongoing"
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://festival/{start_date}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
-@mcp.tool()
+@mcp.tool
 async def find_accommodations(
-    area_code: str = None,
-    sigungu_code: str = None,
-    language: str = None,
+    area_code: str | None = None,
+    sigungu_code: str | None = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Find accommodations in Korea by area.
     
@@ -297,19 +397,27 @@ async def find_accommodations(
         rows=rows
     )
     
-    return {
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "page_no": results.get("page_no", 1),
         "num_of_rows": results.get("num_of_rows", 0)
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://accommodation/{area_code}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
-@mcp.tool()
+@mcp.tool
 async def get_detailed_information(
     content_id: str,
-    content_type: str = None,
-    language: str = None,
-) -> Dict[str, Any]:
+    content_type: str | None = None,
+    language: str | None = None,
+) -> EmbeddedResource:
     """
     Get detailed information about a specific tourism item in Korea.
     
@@ -364,19 +472,27 @@ async def get_detailed_information(
     
     # Combine all details
     item = common_details.get("items", [{}])[0] if common_details.get("items") else {}
-    return {
+    result_data = {
         **item,
         **intro_details,
         **additional_details
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://detail/{content_id}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
-@mcp.tool()
+@mcp.tool
 async def get_tourism_images(
     content_id: str,
-    language: str = None,
+    language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> Dict[str, Any]:
+) -> EmbeddedResource:
     """
     Get images for a specific tourism item in Korea.
     
@@ -397,19 +513,27 @@ async def get_tourism_images(
         rows=rows
     )
     
-    return {
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "content_id": content_id
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri=f"korea-tourism://images/{content_id}",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
 
-@mcp.tool()
+@mcp.tool
 async def get_area_codes(
-    parent_area_code: str = None,
-    language: str = None,
+    parent_area_code: str | None = None,
+    language: str | None = None,
     page: int = 1,
-    rows: int = 100, # Area codes might be numerous, increase default rows
-) -> Dict[str, Any]:
+    rows: int = 100,
+) -> EmbeddedResource:
     """
     Get area codes for regions in Korea.
     
@@ -430,48 +554,21 @@ async def get_area_codes(
         rows=rows
     )
     
-    return {
+    result_data = {
         "total_count": results.get("total_count", 0),
         "items": results.get("items", []),
         "parent_area_code": parent_area_code
     }
+    return EmbeddedResource(
+        type="resource",
+        resource=TextResourceContents(
+            uri="korea-tourism://area-codes",
+            mimeType="application/json",
+            text=json.dumps(result_data, ensure_ascii=False, indent=2, separators=(',', ': '))
+        )
+    )
+
 
 if __name__ == "__main__":
-    import sys
-    import asyncio
-    
-    # To avoid issues with "unhandled errors in TaskGroup", wrap everything in try-except
-    try:
-        # Use FastMCP's run method which should already handle asyncio event loop
-        # Just make sure to catch exceptions clearly
-        try:
-            mcp.run(transport="stdio")
-        except (KeyboardInterrupt, SystemExit):
-            logger.info("MCP server shutting down gracefully.")
-        except Exception as e:
-            logger.exception(f"Error during MCP execution: {e}") # Use logger.exception
-            sys.exit(1)
-    except Exception as e:
-        logger.exception(f"Error during MCP server setup: {e}") # Use logger.exception
-        sys.exit(1)
-    finally:
-        # Attempt to close API client connections on exit
-        async def close_client():
-            global _api_client
-            if _api_client is not None:
-                logger.info("Closing API client connections...")
-                await KoreaTourismApiClient.close_all_connections()
-                logger.info("API client connections closed.")
-
-        # Run the cleanup in the current or a new event loop if needed
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                 # Schedule the cleanup task
-                 loop.create_task(close_client())
-            else:
-                 loop.run_until_complete(close_client())
-        except RuntimeError: # If no event loop exists
-            asyncio.run(close_client())
-        except Exception as cleanup_exc:
-             logger.error(f"Error during API client cleanup: {cleanup_exc}")
+    # Use FastMCP's simplified run method
+    mcp.run()
