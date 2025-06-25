@@ -14,8 +14,6 @@ import logging
 # Create an MCP server
 mcp = FastMCP(
     name="Korea Tourism API",
-    description="API for Korea Tourism information",
-    version="0.1.3",
     dependencies=["httpx", "cachetools", "tenacity", "ratelimit"],
 )
 
