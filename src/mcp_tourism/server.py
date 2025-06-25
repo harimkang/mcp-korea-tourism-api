@@ -4,6 +4,7 @@ import atexit
 import signal
 import asyncio
 import json
+import sys
 from typing import Dict, Any, Optional
 from fastmcp import FastMCP
 from mcp.types import EmbeddedResource, TextResourceContents
@@ -612,6 +613,79 @@ async def get_area_codes(
     )
 
 
+async def main():
+    """
+    Main execution loop to continuously process requests from stdin.
+    """
+    logger.info("MCP server started, waiting for requests from stdin...")
+    loop = asyncio.get_event_loop()
+    reader = asyncio.StreamReader(loop=loop)
+    protocol = asyncio.StreamReaderProtocol(reader)
+
+    # stdin is not available in this context, using a pipe for communication
+    # In a real stdio server, sys.stdin would be used.
+    # Here we are just setting up the reader.
+    # The parent process will write to the subprocess's stdin.
+    if sys.platform != "win32":
+        await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+    else:
+        # Windows does not support connect_read_pipe with stdin
+        # Fallback to a different approach if needed or assume non-windows for now
+        logger.warning("STDIO server on Windows may have limited functionality.")
+
+
+    while not reader.at_eof():
+        try:
+            request_line = await reader.readline()
+            if not request_line:
+                # End of input stream, exit gracefully
+                await asyncio.sleep(0.1) # prevent busy-looping on EOF
+                continue
+
+            request_data = request_line.decode('utf-8').strip()
+            if not request_data:
+                continue
+
+            logger.info(f"Received request: {request_data}")
+
+            # FastMCP's internal handler expects a dict
+            request_dict = json.loads(request_data)
+
+            # Process the request and get the response
+            response_dict = await mcp.handle_request(request_dict)
+
+            # Send the response back to stdout
+            response_json = json.dumps(response_dict)
+            sys.stdout.write(response_json + "\n")
+            sys.stdout.flush()
+
+        except json.JSONDecodeError:
+            request_id = None
+            logger.error("Failed to decode JSON from request.")
+            # Send back a parse error response
+            error_response = {
+                "jsonrpc": "2.0",
+                "error": {"code": -32700, "message": "Parse error"},
+                "id": request_id,
+            }
+            sys.stdout.write(json.dumps(error_response) + "\n")
+            sys.stdout.flush()
+        except Exception as e:
+            request_id = None
+            logger.error(f"An error occurred while processing request: {e}", exc_info=True)
+            # Send back an internal error response
+            error_response = {
+                "jsonrpc": "2.0",
+                "error": {"code": -32603, "message": "Internal error"},
+                "id": request_id, # Or try to get from request if possible
+            }
+            sys.stdout.write(json.dumps(error_response) + "\n")
+            sys.stdout.flush()
+
 if __name__ == "__main__":
-    # Use FastMCP's simplified run method
-    mcp.run()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Server manually interrupted. Shutting down.")
+    finally:
+        cleanup_resources()
