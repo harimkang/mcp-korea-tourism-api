@@ -31,6 +31,7 @@ Repository = "https://github.com/harimkang/mcp-korea-tourism-api"
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.2.0",
     "pytest>=8.3.5",
     "pytest-asyncio>=0.26.0",
     "respx>=0.22.0",
