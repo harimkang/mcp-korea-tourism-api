@@ -633,16 +633,15 @@ async def main():
         # Fallback to a different approach if needed or assume non-windows for now
         logger.warning("STDIO server on Windows may have limited functionality.")
 
-
     while not reader.at_eof():
         try:
             request_line = await reader.readline()
             if not request_line:
                 # End of input stream, exit gracefully
-                await asyncio.sleep(0.1) # prevent busy-looping on EOF
+                await asyncio.sleep(0.1)  # prevent busy-looping on EOF
                 continue
 
-            request_data = request_line.decode('utf-8').strip()
+            request_data = request_line.decode("utf-8").strip()
             if not request_data:
                 continue
 
@@ -672,15 +671,18 @@ async def main():
             sys.stdout.flush()
         except Exception as e:
             request_id = None
-            logger.error(f"An error occurred while processing request: {e}", exc_info=True)
+            logger.error(
+                f"An error occurred while processing request: {e}", exc_info=True
+            )
             # Send back an internal error response
             error_response = {
                 "jsonrpc": "2.0",
                 "error": {"code": -32603, "message": "Internal error"},
-                "id": request_id, # Or try to get from request if possible
+                "id": request_id,  # Or try to get from request if possible
             }
             sys.stdout.write(json.dumps(error_response) + "\n")
             sys.stdout.flush()
+
 
 if __name__ == "__main__":
     try:
