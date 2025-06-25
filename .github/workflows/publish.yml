@@ -3,7 +3,7 @@ name: Publish Python Package
 on:
   push:
     tags:
-      - 'v*.*.*' # Trigger on version tags like v0.1.0
+      - "v*.*.*" # Trigger on version tags like v0.1.0
 
 jobs:
   deploy:
@@ -17,40 +17,40 @@ jobs:
       packages: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12' # Match project's Python version
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12" # Match project's Python version
 
-    - name: Install build dependencies
-      run: |
+      - name: Install build dependencies
+        run: |
           python -m pip install --upgrade pip
           pip install build twine
 
-    - name: Build package
-      run: python -m build
+      - name: Build package
+        run: python -m build
 
-    - name: Publish package to PyPI using twine directly
-      # Run twine upload directly using the installed twine version
-      # This uses the token stored in GitHub Secrets via environment variables
-      run: >-
-        twine upload dist/*
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Publish package to PyPI using twine directly
+        # Run twine upload directly using the installed twine version
+        # This uses the token stored in GitHub Secrets via environment variables
+        run: >-
+          twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
 
-    - name: Create GitHub Release
-      # Run only if PyPI/twine upload succeeded
-      uses: softprops/action-gh-release@v2.0.9
-      if: success() # Check if the twine upload step succeeded
-      with:
-        # Creates release based on the tag name (e.g., v0.1.0)
-        # You can customize the release name and body if needed
-        # name: Release ${{ github.ref_name }}
-        # body: See CHANGELOG.md for details.
-        files: dist/* # Uploads the .whl and .tar.gz files as assets
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Uses the default GitHub token 
+      - name: Create GitHub Release
+        # Run only if PyPI/twine upload succeeded
+        uses: softprops/action-gh-release@v2.0.9
+        if: success() # Check if the twine upload step succeeded
+        with:
+          # Creates release based on the tag name (e.g., v0.1.0)
+          # You can customize the release name and body if needed
+          # name: Release ${{ github.ref_name }}
+          # body: See CHANGELOG.md for details.
+          files: dist/* # Uploads the .whl and .tar.gz files as assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Uses the default GitHub token

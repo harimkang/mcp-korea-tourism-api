@@ -2,10 +2,10 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    types: [ opened, synchronize, reopened, ready_for_review ] # Trigger on relevant PR events
-    branches: [ main ]
+    types: [opened, synchronize, reopened, ready_for_review] # Trigger on relevant PR events
+    branches: [main]
 
 jobs:
   test:
@@ -15,61 +15,65 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12' # Match project's Python version
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12" # Match project's Python version
 
-    - name: Install uv
-      run: curl -LsSf https://astral.sh/uv/install.sh | sh && echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-      shell: bash
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh && echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        shell: bash
 
-    - name: Verify uv installation
-      run: uv --version
+      - name: Verify uv installation
+        run: uv --version
 
-    - name: Install Python dependencies including dev group
-      # Installs main dependencies and those listed under [project.optional-dependencies.dev]
-      run: uv sync --dev --all-extras
+      - name: Install Python dependencies including dev group
+        # Installs main dependencies and those listed under [project.optional-dependencies.dev]
+        run: uv sync --dev --all-extras
 
-    # --- Add this step to install the project itself ---
-    - name: Install project in editable mode
-      # This makes the 'mcp_tourism' package importable from the src directory
-      run: uv pip install -e .
+      # --- Add this step to install the project itself ---
+      - name: Install project in editable mode
+        # This makes the 'mcp_tourism' package importable from the src directory
+        run: uv pip install -e .
 
-    # --- 1. Unit Tests ---
-    - name: Run Unit Tests with pytest via uv
-      # Run pytest using uv run to ensure correct environment context
-      # This step will fail if any unit test fails, stopping the workflow here
-      run: uv run pytest tests/
+      # --- 0. Pre-commit ---
+      - name: Run pre-commit
+        run: uv run pre-commit run --all-files
 
-    # --- 2. uv Run Test ---
-    # This step only runs if unit tests passed
-    - name: Run server with uv briefly
-      run: |
-        echo "Attempting to run server with uv for 5 seconds..."
-        # Run uv in the background, wait 5 seconds, then kill it.
-        # Check if the process exits with expected codes (0, 124 for timeout, 143 for SIGTERM).
-        timeout 5s uv run -m mcp_tourism.server || status=$?
-        if [[ $status != 124 && $status != 143 && $status != 0 ]]; then
-          echo "uv run command failed with unexpected status: $status"
-          exit $status
-        elif [[ $status == 124 || $status == 143 ]]; then
-           echo "uv run process successfully killed by timeout/SIGTERM as expected."
-           # Treat timeout/sigterm as success for this check
-        elif [[ $status == 0 ]]; then
-           echo "uv run process exited cleanly (unexpected but okay)."
-        fi
-        echo "uv run check passed."
-      env:
-        # Use a dummy key for CI environment where actual API calls aren't made
-        KOREA_TOURISM_API_KEY: "DUMMY_FOR_CI"
-      shell: bash
+      # --- 1. Unit Tests ---
+      - name: Run Unit Tests with pytest via uv
+        # Run pytest using uv run to ensure correct environment context
+        # This step will fail if any unit test fails, stopping the workflow here
+        run: uv run pytest tests/
 
-    # --- 3. Docker Test ---
-    # This step only runs if uv run test passed
-    - name: Build Docker image
-      # This step will fail if the build fails
-      run: docker build -t mcp-korea-tourism .
+      # --- 2. uv Run Test ---
+      # This step only runs if unit tests passed
+      - name: Run server with uv briefly
+        run: |
+          echo "Attempting to run server with uv for 5 seconds..."
+          # Run uv in the background, wait 5 seconds, then kill it.
+          # Check if the process exits with expected codes (0, 124 for timeout, 143 for SIGTERM).
+          timeout 5s uv run -m mcp_tourism.server || status=$?
+          if [[ $status != 124 && $status != 143 && $status != 0 ]]; then
+            echo "uv run command failed with unexpected status: $status"
+            exit $status
+          elif [[ $status == 124 || $status == 143 ]]; then
+             echo "uv run process successfully killed by timeout/SIGTERM as expected."
+             # Treat timeout/sigterm as success for this check
+          elif [[ $status == 0 ]]; then
+             echo "uv run process exited cleanly (unexpected but okay)."
+          fi
+          echo "uv run check passed."
+        env:
+          # Use a dummy key for CI environment where actual API calls aren't made
+          KOREA_TOURISM_API_KEY: "DUMMY_FOR_CI"
+        shell: bash
+
+      # --- 3. Docker Test ---
+      # This step only runs if uv run test passed
+      - name: Build Docker image
+        # This step will fail if the build fails
+        run: docker build -t mcp-korea-tourism .

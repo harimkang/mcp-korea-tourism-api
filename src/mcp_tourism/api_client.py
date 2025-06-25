@@ -6,7 +6,12 @@ import json
 import codecs
 from typing import Dict, Optional, Any, Literal, ClassVar
 from cachetools import TTLCache
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 from ratelimit import limits, sleep_and_retry
 
 
@@ -24,15 +29,16 @@ CONTENTTYPE_ID_MAP = {
 
 # Map of supported languages to their service endpoints
 LANGUAGE_SERVICE_MAP = {
-    "en": "EngService1",   # English
-    "jp": "JpnService1",   # Japanese
-    "zh-cn": "ChsService1", # Simplified Chinese
-    "zh-tw": "ChtService1", # Traditional Chinese
-    "de": "GerService1",   # German
-    "fr": "FreService1",   # French
-    "es": "SpnService1",   # Spanish
-    "ru": "RusService1",   # Russian
+    "en": "EngService1",  # English
+    "jp": "JpnService1",  # Japanese
+    "zh-cn": "ChsService1",  # Simplified Chinese
+    "zh-tw": "ChtService1",  # Traditional Chinese
+    "de": "GerService1",  # German
+    "fr": "FreService1",  # French
+    "es": "SpnService1",  # Spanish
+    "ru": "RusService1",  # Russian
 }
+
 
 def decode_unicode_escapes(obj: Any) -> Any:
     """
@@ -42,10 +48,10 @@ def decode_unicode_escapes(obj: Any) -> Any:
     """
     if isinstance(obj, str):
         # Only attempt decoding if the string contains unicode escape sequences
-        if '\\u' in obj:
+        if "\\u" in obj:
             try:
                 # Try to decode unicode escape sequences (e.g., \\uc11c\\uc6b8 -> 서울)
-                return codecs.decode(obj, 'unicode_escape')
+                return codecs.decode(obj, "unicode_escape")
             except (UnicodeDecodeError, ValueError):
                 # If decoding fails, return original string
                 return obj
@@ -59,9 +65,16 @@ def decode_unicode_escapes(obj: Any) -> Any:
     else:
         return obj
 
+
 class TourismApiError(Exception):
     """Base exception for Tourism API errors"""
-    def __init__(self, message: str, response: Optional[httpx.Response] = None, request: Optional[httpx.Request] = None):
+
+    def __init__(
+        self,
+        message: str,
+        response: Optional[httpx.Response] = None,
+        request: Optional[httpx.Request] = None,
+    ):
         super().__init__(message)
         self.message = message
         self.response = response
@@ -75,24 +88,31 @@ class TourismApiError(Exception):
             base_str += f" (Request URL: {self.request.url})"
         return base_str
 
+
 class TourismApiConnectionError(TourismApiError):
     """Connection error with Tourism API"""
+
     # Usually no response, so focus on request
     def __init__(self, message: str, request: Optional[httpx.Request] = None):
-         super().__init__(message, response=None, request=request)
+        super().__init__(message, response=None, request=request)
+
 
 class TourismApiClientError(TourismApiError):
     """Client-side error with Tourism API requests (4xx)"""
+
     pass
+
 
 class TourismApiServerError(TourismApiError):
     """Server-side error with Tourism API operations (5xx)"""
+
     pass
+
 
 class KoreaTourismApiClient:
     """
     Client for the Korea Tourism Organization API with caching and rate limiting.
-    
+
     Features:
     - Multi-language support
     - Response caching with TTL
@@ -100,17 +120,17 @@ class KoreaTourismApiClient:
     - Automatic retries for transient errors
     - Connection pooling
     """
-    
+
     # Base URL for all services
     BASE_URL = "http://apis.data.go.kr/B551011"
-    
+
     # --- Constants for API Parameters ---
     DEFAULT_NUM_OF_ROWS = 100
     DEFAULT_PAGE_NO = 1
     MOBILE_OS = "ETC"
     MOBILE_APP = "MobileApp"
     RESPONSE_FORMAT = "json"
-    ARRANGE_MODIFIED_WITH_IMAGE = "Q" # Sort by modified date with image
+    ARRANGE_MODIFIED_WITH_IMAGE = "Q"  # Sort by modified date with image
     LIST_YN_YES = "Y"
     DEFAULT_YN_YES = "Y"
     DEFAULT_YN_NO = "N"
@@ -133,7 +153,7 @@ class KoreaTourismApiClient:
     SUB_IMAGE_YN_YES = "Y"
     SUB_IMAGE_YN_NO = "N"
     # --- End Constants ---
-    
+
     # Common endpoints (will be prefixed with service name)
     AREA_BASED_LIST_ENDPOINT = "/areaBasedList1"
     LOCATION_BASED_LIST_ENDPOINT = "/locationBasedList1"
@@ -147,7 +167,7 @@ class KoreaTourismApiClient:
     AREA_BASED_SYNC_LIST_ENDPOINT = "/areaBasedSyncList1"
     AREA_CODE_LIST_ENDPOINT = "/areaCode1"
     CATEGORY_CODE_LIST_ENDPOINT = "/categoryCode1"
-    
+
     # Class-level connection pool and semaphore for concurrency control
     _shared_client: ClassVar[Optional[httpx.AsyncClient]] = None
     _client_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
@@ -161,7 +181,7 @@ class KoreaTourismApiClient:
         cache_ttl: int = 86400,
         rate_limit_calls: int = 5,
         rate_limit_period: int = 1,
-        concurrency_limit: int = 10
+        concurrency_limit: int = 10,
     ):
         """
         Initialize with API key and optional configurations.
@@ -175,7 +195,9 @@ class KoreaTourismApiClient:
             concurrency_limit: Maximum number of concurrent API requests.
         """
         self.api_key = api_key
-        if not self.api_key or self.api_key == "missing_api_key": # Check for placeholder too
+        if (
+            not self.api_key or self.api_key == "missing_api_key"
+        ):  # Check for placeholder too
             # Log warning here instead of raising immediately, allows lazy init check
             logging.warning("Korean Tourism API key is missing or invalid.")
             # We don't raise here because get_api_client in server.py handles this
@@ -196,7 +218,7 @@ class KoreaTourismApiClient:
         self._is_fully_initialized = False
         self._cache: Optional[TTLCache] = None
         self._request_semaphore: Optional[asyncio.Semaphore] = None
-        self.logger: Optional[logging.Logger] = None # Add logger type hint
+        self.logger: Optional[logging.Logger] = None  # Add logger type hint
 
     def _ensure_full_initialization(self):
         """Ensure all initialization tasks are completed before first API request"""
@@ -205,8 +227,10 @@ class KoreaTourismApiClient:
 
         # Get logger first
         self.logger = logging.getLogger(self._logger_name)
-        if not self.logger.hasHandlers(): # Basic check to prevent duplicate handlers if called multiple times
-            logging.basicConfig(level=logging.INFO) # Basic config if not already set
+        if (
+            not self.logger.hasHandlers()
+        ):  # Basic check to prevent duplicate handlers if called multiple times
+            logging.basicConfig(level=logging.INFO)  # Basic config if not already set
 
         # Validate API key presence here before proceeding
         if not self.api_key or self.api_key == "missing_api_key":
@@ -217,7 +241,9 @@ class KoreaTourismApiClient:
         # Initialize language service using the stored default
         self.language = self.default_language
         if self.language not in LANGUAGE_SERVICE_MAP:
-            self.logger.warning(f"Unsupported language: {self.language}. Falling back to English.")
+            self.logger.warning(
+                f"Unsupported language: {self.language}. Falling back to English."
+            )
             self.language = "en"
 
         self.service_name = LANGUAGE_SERVICE_MAP[self.language]
@@ -236,18 +262,20 @@ class KoreaTourismApiClient:
         """Lazy cache initialization"""
         self._ensure_full_initialization()
         return self._cache  # type: ignore  # We know it's initialized after _ensure_full_initialization
-    
+
     @classmethod
     async def get_shared_client(cls) -> httpx.AsyncClient:
         """Get or create the shared HTTP client with connection pooling"""
         async with cls._client_lock:
             if cls._shared_client is None:
                 cls._shared_client = httpx.AsyncClient(
-                    limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
-                    timeout=httpx.Timeout(30.0)
+                    limits=httpx.Limits(
+                        max_connections=100, max_keepalive_connections=20
+                    ),
+                    timeout=httpx.Timeout(30.0),
                 )
             return cls._shared_client
-        
+
     @classmethod
     async def close_all_connections(cls):
         """Close the shared client connection - call this when your application is shutting down"""
@@ -255,14 +283,14 @@ class KoreaTourismApiClient:
             if cls._shared_client is not None:
                 await cls._shared_client.aclose()
                 cls._shared_client = None
-    
+
     def _process_response_error(self, response: httpx.Response):
         """Process HTTP errors and raise appropriate exceptions"""
         # Check status code first for efficiency
         if response.status_code >= 400:
             status_code = response.status_code
-            request = response.request # Get the request object
-            
+            request = response.request  # Get the request object
+
             # Try to extract error message
             error_msg = f"Tourism API error: HTTP {status_code}"
             try:
@@ -271,32 +299,52 @@ class KoreaTourismApiClient:
                     error_msg = f"Tourism API error: {error_data['error']}"
             except Exception:
                 pass
-                
+
             # Map status code to exception type
             if status_code >= 400 and status_code < 500:
                 # Pass response and request to the exception
-                raise TourismApiClientError(f"Client error: {error_msg}", response=response, request=request)
+                raise TourismApiClientError(
+                    f"Client error: {error_msg}", response=response, request=request
+                )
             else:
                 # Pass response and request to the exception
-                raise TourismApiServerError(f"Server error: {error_msg}", response=response, request=request)
-    
-    def _get_cache_key(self, endpoint: str, params: Dict[str, Any], language: str) -> str:
+                raise TourismApiServerError(
+                    f"Server error: {error_msg}", response=response, request=request
+                )
+
+    def _get_cache_key(
+        self, endpoint: str, params: Dict[str, Any], language: str
+    ) -> str:
         """Generate a unique cache key for an API request, including language."""
         # Sort params to ensure consistent keys, exclude common/dynamic ones
         sorted_params = sorted(
-            [(k, v) for k, v in params.items() if k not in ("MobileOS", "MobileApp", "serviceKey", "_type")]
+            [
+                (k, v)
+                for k, v in params.items()
+                if k not in ("MobileOS", "MobileApp", "serviceKey", "_type")
+            ]
         )
         # Include language in cache key
-        param_str = f"lang={language}&" + "&".join([f"{k}={v}" for k, v in sorted_params])
+        param_str = f"lang={language}&" + "&".join(
+            [f"{k}={v}" for k, v in sorted_params]
+        )
         return f"{endpoint}?{param_str}"
-    
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((httpx.ConnectTimeout, httpx.ConnectError, TourismApiServerError)),
-        reraise=True
+        retry=retry_if_exception_type(
+            (httpx.ConnectTimeout, httpx.ConnectError, TourismApiServerError)
+        ),
+        reraise=True,
     )
-    async def _make_request(self, endpoint: str, params: Dict[str, Any], use_cache: bool = True, language_override: Optional[str] = None) -> Dict[str, Any]:
+    async def _make_request(
+        self,
+        endpoint: str,
+        params: Dict[str, Any],
+        use_cache: bool = True,
+        language_override: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Make a request to the API with caching, rate limiting, and language override."""
         # Ensure all initialization is completed
         self._ensure_full_initialization()
@@ -309,10 +357,10 @@ class KoreaTourismApiClient:
             lang_lower = language_override.lower()
             if lang_lower in LANGUAGE_SERVICE_MAP:
                 request_language = lang_lower
-        
+
         request_service_name = LANGUAGE_SERVICE_MAP[request_language]
         request_full_base_url = f"{self.BASE_URL}/{request_service_name}"
-        
+
         # Check cache first if caching is enabled, using the request-specific language
         if use_cache:
             cache_key = self._get_cache_key(endpoint, params, request_language)
@@ -334,73 +382,83 @@ class KoreaTourismApiClient:
                     "MobileApp": self.MOBILE_APP,
                     # Defaults like numOfRows/pageNo are better set by calling methods or API defaults
                     "_type": self.RESPONSE_FORMAT,
-                    **params
+                    **params,
                 }
-                
+
                 # API key handling remains the same for now
-                serviceKey = self.api_key # Already validated in _ensure_full_initialization
-                
+                serviceKey = (
+                    self.api_key
+                )  # Already validated in _ensure_full_initialization
+
                 # Build the full URL with the determined service for this request
                 url = f"{request_full_base_url}{endpoint}"
-                
+
                 client = await self.get_shared_client()
-                
+
                 # First, encode the parameters
                 encoded_params = urllib.parse.urlencode(full_params)
-                
+
                 # Then append the already-encoded service key
                 full_url = f"{url}?serviceKey={serviceKey}&{encoded_params}"
                 response = await client.get(full_url)
-                
+
                 self._process_response_error(response)
-                
+
                 # Parse the response with better error handling
                 try:
                     # Check if the response has content
                     if not response.content or len(response.content.strip()) == 0:
-                        raise TourismApiError("Empty response received from tourism API")
-                    
+                        raise TourismApiError(
+                            "Empty response received from tourism API"
+                        )
+
                     result = response.json()
                 except json.JSONDecodeError as e:
                     raise TourismApiError(f"Invalid JSON response: {str(e)}")
-                
+
                 # Extract the items from the nested response structure
                 try:
                     response_header = result["response"]["header"]
                     response_body = result["response"]["body"]
-                    
+
                     result_code = response_header.get("resultCode")
                     if result_code != "0000":
-                        raise TourismApiError(f"API error: {response_header.get('resultMsg', 'Unknown error')}")
-                    
+                        raise TourismApiError(
+                            f"API error: {response_header.get('resultMsg', 'Unknown error')}"
+                        )
+
                     total_count = response_body.get("totalCount", 0)
                     items = []
-                    
+
                     if total_count > 0:
                         items_container = response_body.get("items", {})
                         if "item" in items_container:
                             items = items_container["item"]
                             if not isinstance(items, list):
-                                items = [items]  # Ensure items is a list even if there's only one result
-                    
+                                items = [
+                                    items
+                                ]  # Ensure items is a list even if there's only one result
+
                     # Structure the results
                     result_data = {
                         "total_count": total_count,
                         "num_of_rows": response_body.get("numOfRows", 0),
                         "page_no": response_body.get("pageNo", 1),
-                        "items": items
+                        "items": items,
                     }
-                    
+
                     # Apply unicode decoding to handle Korean character encoding issues
                     result_data = decode_unicode_escapes(result_data)
-                    
+
                     # Cache the response if caching is enabled, using the request-specific language
                     if use_cache:
-                        cache_key = self._get_cache_key(endpoint, params, request_language)
+                        cache_key = self._get_cache_key(
+                            endpoint, params, request_language
+                        )
                         self.cache[cache_key] = result_data
-                    
+
                     return result_data
-                    
+
                 except (KeyError, TypeError) as e:
                     raise TourismApiError(f"Failed to parse API response: {e}")
 
@@ -419,12 +477,12 @@ class KoreaTourismApiClient:
         cat3: Optional[str] = None,
         language: Optional[str] = None,
         page: int = 1,
-        rows: int = 20
+        rows: int = 20,
     ) -> Dict[str, Any]:
         """
         Search tourism information by keyword.
         /searchKeyword1
-        
+
         Args:
             keyword: Search keyword (required)
             content_type_id: Content type ID to filter results
@@ -436,7 +494,7 @@ class KoreaTourismApiClient:
             language: Override the client's default language
             page: Page number for pagination
             rows: Number of items per page
-            
+
         Returns:
             Dictionary containing search results with structure:
             {
@@ -447,7 +505,7 @@ class KoreaTourismApiClient:
                     {
                         "title": str,           # Name of the attraction/place
                         "addr1": str,           # Primary address
-                        "addr2": str,           # Secondary address 
+                        "addr2": str,           # Secondary address
                         "areacode": str,        # Area code
                         "sigungucode": str,     # Sigungu code
                         "cat1": str,            # Category 1 code
@@ -471,7 +529,7 @@ class KoreaTourismApiClient:
         """
         if not keyword:
             raise ValueError("Keyword must be provided for search_by_keyword")
-            
+
         params: Dict[str, Any] = {
             "keyword": keyword,
             "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,
@@ -488,7 +546,7 @@ class KoreaTourismApiClient:
 
             if sigungu_code:
                 params["sigunguCode"] = sigungu_code
-        
+
         if cat1:
             params["cat1"] = cat1
 
@@ -497,14 +555,12 @@ class KoreaTourismApiClient:
 
                 if cat3:
                     params["cat3"] = cat3
-        
+
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.SEARCH_KEYWORD_ENDPOINT,
-            params,
-            language_override=language
+            self.SEARCH_KEYWORD_ENDPOINT, params, language_override=language
         )
-    
+
     async def get_area_based_list(
         self,
         area_code: Optional[str] = None,
@@ -519,7 +575,7 @@ class KoreaTourismApiClient:
     ) -> Dict[str, Any]:
         """
         Get a list of tourism information by area.
-        
+
         Args:
             area_code: Area code to filter results
             content_type_id: Content type ID to filter results
@@ -540,7 +596,7 @@ class KoreaTourismApiClient:
                     {
                         "title": str,           # Name of the attraction/place
                         "addr1": str,           # Primary address
-                        "addr2": str,           # Secondary address 
+                        "addr2": str,           # Secondary address
                         "areacode": str,        # Area code
                         "sigungucode": str,     # Sigungu code
                         "cat1": str,            # Category 1 code
@@ -569,7 +625,7 @@ class KoreaTourismApiClient:
             "numOfRows": str(rows),
             # "_type": self.RESPONSE_FORMAT, # Added in _make_request
         }
-        
+
         # Add optional filters
         if area_code:
             params["areaCode"] = area_code
@@ -578,22 +634,20 @@ class KoreaTourismApiClient:
 
         if content_type_id:
             params["contentTypeId"] = content_type_id
-            
+
         # Add category filters if provided
         if cat1:
             params["cat1"] = cat1
-            
+
             if cat2:
                 params["cat2"] = cat2
-                
+
                 if cat3:
                     params["cat3"] = cat3
-        
+
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.AREA_BASED_LIST_ENDPOINT,
-            params,
-            language_override=language
+            self.AREA_BASED_LIST_ENDPOINT, params, language_override=language
         )
 
     async def get_location_based_list(
@@ -608,7 +662,7 @@ class KoreaTourismApiClient:
     ) -> Dict[str, Any]:
         """
         Get a list of tourism information by location.
-        
+
         Args:
             mapx: Map X coordinate
             mapy: Map Y coordinate
@@ -616,8 +670,8 @@ class KoreaTourismApiClient:
             content_type_id: Content type ID from the tourism API
             language: Override the client's default language
             page: Page number for pagination
-            rows: Number of items per page  
-            
+            rows: Number of items per page
+
         Returns:
             Dictionary containing location-based tourism information with structure:
             {
@@ -628,7 +682,7 @@ class KoreaTourismApiClient:
                     {
                         "title": str,           # Name of the attraction/place
                         "addr1": str,           # Primary address
-                        "addr2": str,           # Secondary address 
+                        "addr2": str,           # Secondary address
                         "areacode": str,        # Area code
                         "sigungucode": str,     # Sigungu code
                         "cat1": str,            # Category 1 code
@@ -652,7 +706,9 @@ class KoreaTourismApiClient:
         """
         # Parameter validation
         if mapx is None or mapy is None or radius is None:
-            raise ValueError("mapx, mapy, and radius are required for location-based search")
+            raise ValueError(
+                "mapx, mapy, and radius are required for location-based search"
+            )
         try:
             # Ensure radius is a positive integer
             radius_int = int(radius)
@@ -673,12 +729,10 @@ class KoreaTourismApiClient:
 
         if content_type_id:
             params["contentTypeId"] = content_type_id
-        
+
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.LOCATION_BASED_LIST_ENDPOINT,
-            params,
-            language_override=language
+            self.LOCATION_BASED_LIST_ENDPOINT, params, language_override=language
         )
 
     async def search_festival(
@@ -689,11 +743,11 @@ class KoreaTourismApiClient:
         sigungu_code: Optional[str] = None,
         language: Optional[str] = None,
         page: int = 1,
-        rows: int = 20
+        rows: int = 20,
     ) -> Dict[str, Any]:
         """
         Search for festivals by date and location.
-        
+
         Args:
             event_start_date: Start date of the event (YYYYMMDD)
             event_end_date: End date of the event (YYYYMMDD)
@@ -701,8 +755,8 @@ class KoreaTourismApiClient:
             sigungu_code: Sigungu code to filter results, areaCode is required
             language: Override the client's default language
             page: Page number for pagination
-            rows: Number of items per page  
-            
+            rows: Number of items per page
+
         Returns:
             Dictionary containing festival information with structure:
             {
@@ -713,7 +767,7 @@ class KoreaTourismApiClient:
                     {
                         "title": str,           # Name of the festival
                         "addr1": str,           # Primary address
-                        "addr2": str,           # Secondary address 
+                        "addr2": str,           # Secondary address
                         "areacode": str,        # Area code
                         "contentid": str,       # Unique content ID
                         "contenttypeid": str,   # Content type ID
@@ -737,22 +791,30 @@ class KoreaTourismApiClient:
         if not event_start_date:
             raise ValueError("event_start_date (YYYYMMDD) is required")
         # Basic format check (can be improved with regex)
-        if not (isinstance(event_start_date, str) and len(event_start_date) == 8 and event_start_date.isdigit()):
+        if not (
+            isinstance(event_start_date, str)
+            and len(event_start_date) == 8
+            and event_start_date.isdigit()
+        ):
             raise ValueError("event_start_date must be in YYYYMMDD format")
-        if event_end_date and not (isinstance(event_end_date, str) and len(event_end_date) == 8 and event_end_date.isdigit()):
+        if event_end_date and not (
+            isinstance(event_end_date, str)
+            and len(event_end_date) == 8
+            and event_end_date.isdigit()
+        ):
             raise ValueError("event_end_date must be in YYYYMMDD format")
 
         params: Dict[str, Any] = {
             "eventStartDate": event_start_date,
             "pageNo": str(page),
             "numOfRows": str(rows),
-            "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE, # Default arrange added
-            "listYN": self.LIST_YN_YES,                # Default listYN added
+            "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,  # Default arrange added
+            "listYN": self.LIST_YN_YES,  # Default listYN added
         }
 
         if event_end_date:
             params["eventEndDate"] = event_end_date
-        
+
         if area_code:
             params["areaCode"] = area_code
 
@@ -761,9 +823,7 @@ class KoreaTourismApiClient:
 
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.SEARCH_FESTIVAL_ENDPOINT,
-            params,
-            language_override=language
+            self.SEARCH_FESTIVAL_ENDPOINT, params, language_override=language
         )
 
     async def search_stay(
@@ -776,14 +836,14 @@ class KoreaTourismApiClient:
     ) -> Dict[str, Any]:
         """
         Search for stays by area and sigungu.
-        
+
         Args:
             area_code: Area code to filter results
             sigungu_code: Sigungu code to filter results, areaCode is required
             rows: Number of items per page
             page: Page number for pagination
-            language: Override the client's default language    
-            
+            language: Override the client's default language
+
         Returns:
             Dictionary containing accommodation information with structure:
             {
@@ -794,7 +854,7 @@ class KoreaTourismApiClient:
                     {
                         "title": str,           # Name of the accommodation
                         "addr1": str,           # Primary address
-                        "addr2": str,           # Secondary address 
+                        "addr2": str,           # Secondary address
                         "areacode": str,        # Area code
                         "sigungucode": str,     # Sigungu code
                         "contentid": str,       # Unique content ID
@@ -820,8 +880,8 @@ class KoreaTourismApiClient:
         params: Dict[str, Any] = {
             "pageNo": str(page),
             "numOfRows": str(rows),
-            "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE, # Default arrange added
-            "listYN": self.LIST_YN_YES,                # Default listYN added
+            "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,  # Default arrange added
+            "listYN": self.LIST_YN_YES,  # Default listYN added
         }
 
         if area_code:
@@ -832,9 +892,7 @@ class KoreaTourismApiClient:
 
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.SEARCH_STAY_ENDPOINT,
-            params,
-            language_override=language
+            self.SEARCH_STAY_ENDPOINT, params, language_override=language
         )
 
     async def get_detail_common(
@@ -858,7 +916,7 @@ class KoreaTourismApiClient:
         representative image, classification information, regional information,
         address information, coordinate information, outline information, road guidance information,
         image information, linked tourism information list
-        
+
         Args:
             content_id: Content ID from the tourism API
             content_type_id: Content type ID from the tourism API
@@ -873,7 +931,7 @@ class KoreaTourismApiClient:
             trans_guide_yn: Whether to include road guidance information
             rows: Number of items per page
             page: Page number for pagination
-            
+
         Returns:
             Dictionary containing common details about a tourism item with structure:
             {
@@ -910,7 +968,7 @@ class KoreaTourismApiClient:
         """
         if not content_id:
             raise ValueError("content_id is required")
-            
+
         params: Dict[str, Any] = {
             "contentId": content_id,
             "defaultYN": default_yn,
@@ -922,7 +980,7 @@ class KoreaTourismApiClient:
             "overviewYN": overview_yn,
             "transGuideYN": trans_guide_yn,
             "pageNo": str(page),
-            "numOfRows": str(rows)
+            "numOfRows": str(rows),
         }
 
         if content_type_id:
@@ -930,11 +988,9 @@ class KoreaTourismApiClient:
 
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.DETAIL_COMMON_ENDPOINT,
-            params,
-            language_override=language
+            self.DETAIL_COMMON_ENDPOINT, params, language_override=language
         )
-    
+
     async def get_detail_images(
         self,
         content_id: str,
@@ -942,11 +998,11 @@ class KoreaTourismApiClient:
         image_yn: Literal["Y", "N"] = "Y",
         sub_image_yn: Literal["Y", "N"] = "Y",
         rows: int = 20,
-        page: int = 1
+        page: int = 1,
     ) -> Dict[str, Any]:
         """
         Get images for a tourism item.
-        
+
         Args:
             content_id: Content ID from the tourism API
             language: Override the client's default language
@@ -954,7 +1010,7 @@ class KoreaTourismApiClient:
             sub_image_yn: Y=Inquiry of original,thumbnail image,public Nuri copyright type information N=Null
             rows: Number of items per page
             page: Page number for pagination
-            
+
         Returns:
             Dictionary containing images for a tourism item with structure:
             {
@@ -975,22 +1031,19 @@ class KoreaTourismApiClient:
             }
         """
         if not content_id:
-             raise ValueError("content_id is required")
-             
+            raise ValueError("content_id is required")
+
         params: Dict[str, Any] = {
             "contentId": content_id,
             "imageYN": image_yn,
             "subImageYN": sub_image_yn,
             "numOfRows": str(rows),
-            "pageNo": str(page)
+            "pageNo": str(page),
         }
 
-        
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.DETAIL_IMAGE_ENDPOINT,
-            params,
-            language_override=language
+            self.DETAIL_IMAGE_ENDPOINT, params, language_override=language
         )
 
     async def get_detail_intro(
@@ -999,18 +1052,18 @@ class KoreaTourismApiClient:
         content_type_id: str,
         language: Optional[str] = None,
         rows: int = 20,
-        page: int = 1
+        page: int = 1,
     ) -> Dict[str, Any]:
         """
         Function to check detailed introduction (off day, opening period, etc.)
-        
+
         Args:
             content_id: Content ID from the tourism API
             content_type_id: Content type ID from the tourism API
             language: Override the client's default language
             rows: Number of items per page
             page: Page number for pagination
-            
+
         Returns:
             Dictionary containing detailed introduction information with structure:
             {
@@ -1022,7 +1075,7 @@ class KoreaTourismApiClient:
                         "contentid": str,         # Content ID
                         "contenttypeid": str,     # Content type ID
                         # The following fields vary based on content_type_id:
-                        
+
                         # Attraction specific fields may include:
                         "infocenter": str,        # Information center
                         "restdate": str,          # Rest/closing days
@@ -1031,7 +1084,7 @@ class KoreaTourismApiClient:
                         "chkbabycarriage": str,   # Baby carriage accessibility
                         "chkpet": str,            # Pet allowance
                         "chkcreditcard": str,     # Credit card acceptance
-                        
+
                         # Festival specific fields may include:
                         "eventstartdate": str,    # Festival start date
                         "eventenddate": str,      # Festival end date
@@ -1039,14 +1092,14 @@ class KoreaTourismApiClient:
                         "usetimefestival": str,   # Festival hours
                         "sponsor1": str,          # Primary sponsor
                         "sponsor2": str,          # Secondary sponsor
-                        
+
                         # Restaurant specific fields may include:
                         "firstmenu": str,         # Main menu items
                         "treatmenu": str,         # Specialty dishes
                         "opentimefood": str,      # Opening hours
                         "restdatefood": str,      # Closing days
                         "reservationfood": str,   # Reservation information
-                        
+
                         # Accommodation specific fields may include:
                         "checkintime": str,       # Check-in time
                         "checkouttime": str,      # Check-out time
@@ -1057,7 +1110,7 @@ class KoreaTourismApiClient:
                     }
                 ]
             }
-            
+
             Note: The actual fields returned depend on the content_type_id and will vary between different types of tourism items.
         """
         if not content_id:
@@ -1068,34 +1121,32 @@ class KoreaTourismApiClient:
             "contentId": content_id,
             "contentTypeId": content_type_id,
             "numOfRows": str(rows),
-            "pageNo": str(page)
+            "pageNo": str(page),
         }
 
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.DETAIL_INTRO_ENDPOINT,
-            params,
-            language_override=language
+            self.DETAIL_INTRO_ENDPOINT, params, language_override=language
         )
-    
+
     async def get_detail_info(
         self,
         content_id: str,
         content_type_id: str,
         language: Optional[str] = None,
         rows: int = 20,
-        page: int = 1
+        page: int = 1,
     ) -> Dict[str, Any]:
         """
         Check the details of additional tourism information.
-        
+
         Args:
             content_id: Content ID from the tourism API
             content_type_id: Content type ID from the tourism API
             language: Override the client's default language
             rows: Number of items per page
             page: Page number for pagination
-            
+
         Returns:
             Dictionary containing additional detailed information with structure:
             {
@@ -1114,7 +1165,7 @@ class KoreaTourismApiClient:
                     # ... more items
                 ]
             }
-            
+
             Note: Each item in the 'items' list represents a specific piece of additional information about the tourism item.
         """
         if not content_id:
@@ -1126,14 +1177,12 @@ class KoreaTourismApiClient:
             "contentId": content_id,
             "contentTypeId": content_type_id,
             "numOfRows": str(rows),
-            "pageNo": str(page)
+            "pageNo": str(page),
         }
 
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.DETAIL_INFO_ENDPOINT,
-            params,
-            language_override=language
+            self.DETAIL_INFO_ENDPOINT, params, language_override=language
         )
 
     async def get_area_based_sync_list(
@@ -1147,11 +1196,11 @@ class KoreaTourismApiClient:
         language: Optional[str] = None,
         show_flag: Optional[Literal["0", "1"]] = None,
         rows: int = 20,
-        page: int = 1
+        page: int = 1,
     ) -> Dict[str, Any]:
         """
         Detailed function of inquiring about the tourism information synchronization list (provided whether the contents are displayed or not)
-        
+
         Args:
             area_code: Area code from the tourism API
             content_type_id: Content type ID from the tourism API
@@ -1163,7 +1212,7 @@ class KoreaTourismApiClient:
             show_flag: Show flag from the tourism API
             rows: Number of items per page
             page: Page number for pagination
-            
+
         Returns:
             Dictionary containing synchronized tourism information with structure:
             {
@@ -1174,7 +1223,7 @@ class KoreaTourismApiClient:
                     {
                         "title": str,           # Name of the attraction/place
                         "addr1": str,           # Primary address
-                        "addr2": str,           # Secondary address 
+                        "addr2": str,           # Secondary address
                         "areacode": str,        # Area code
                         "sigungucode": str,     # Sigungu code
                         "cat1": str,            # Category 1 code
@@ -1197,8 +1246,8 @@ class KoreaTourismApiClient:
             }
         """
         params: Dict[str, Any] = {
-            "numOfRows": str(rows), # Use str()
-            "pageNo": str(page),    # Use str()
+            "numOfRows": str(rows),  # Use str()
+            "pageNo": str(page),  # Use str()
             "listYN": self.LIST_YN_YES,
             "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,
         }
@@ -1222,12 +1271,10 @@ class KoreaTourismApiClient:
 
         if content_type_id:
             params["contentTypeId"] = content_type_id
-        
+
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.AREA_BASED_SYNC_LIST_ENDPOINT,
-            params,
-            language_override=language
+            self.AREA_BASED_SYNC_LIST_ENDPOINT, params, language_override=language
         )
 
     async def get_area_code_list(
@@ -1235,7 +1282,7 @@ class KoreaTourismApiClient:
         area_code: Optional[str] = None,
         language: Optional[str] = None,
         rows: int = 20,
-        page: int = 1
+        page: int = 1,
     ) -> Dict[str, Any]:
         """
         Get the list of area codes.
@@ -1245,7 +1292,7 @@ class KoreaTourismApiClient:
             language: Override the client's default language
             rows: Number of items per page
             page: Page number for pagination
-            
+
         Returns:
             Dictionary containing area code information with structure:
             {
@@ -1261,22 +1308,20 @@ class KoreaTourismApiClient:
                     # ... more items
                 ]
             }
-            
+
             If area_code is provided, returns sigungu codes for that area.
             If area_code is not provided, returns top-level area codes.
         """
         params: Dict[str, Any] = {
-            "numOfRows": str(rows), # Use str()
-            "pageNo": str(page),    # Use str()
+            "numOfRows": str(rows),  # Use str()
+            "pageNo": str(page),  # Use str()
         }
         if area_code:
             params["areaCode"] = area_code
 
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.AREA_CODE_LIST_ENDPOINT,
-            params,
-            language_override=language
+            self.AREA_CODE_LIST_ENDPOINT, params, language_override=language
         )
 
     async def get_category_code_list(
@@ -1287,7 +1332,7 @@ class KoreaTourismApiClient:
         cat2: Optional[str] = None,
         cat3: Optional[str] = None,
         rows: int = 20,
-        page: int = 1
+        page: int = 1,
     ) -> Dict[str, Any]:
         """
         Get the list of category codes.
@@ -1316,15 +1361,15 @@ class KoreaTourismApiClient:
                     # ... more items
                 ]
             }
-            
+
             The categories returned depend on the parameters provided:
             - Without any parameters: Returns top-level categories (cat1)
             - With cat1: Returns subcategories (cat2) under that cat1
             - With cat1 and cat2: Returns subcategories (cat3) under that cat2
         """
         params: Dict[str, Any] = {
-            "numOfRows": str(rows), # Use str()
-            "pageNo": str(page),    # Use str()
+            "numOfRows": str(rows),  # Use str()
+            "pageNo": str(page),  # Use str()
         }
 
         if content_type_id:
@@ -1338,15 +1383,11 @@ class KoreaTourismApiClient:
 
                 if cat3:
                     params["cat3"] = cat3
-        
+
         # Pass language override directly to _make_request
         return await self._make_request(
-            self.CATEGORY_CODE_LIST_ENDPOINT,
-            params,
-            language_override=language
+            self.CATEGORY_CODE_LIST_ENDPOINT, params, language_override=language
         )
-
-
 
 
 if __name__ == "__main__":
