@@ -733,14 +733,16 @@ def run_server(transport: str, http_config: dict[str, Any]) -> None:
             logger.info("Using stdio transport - connect via MCP client")
             mcp.run(transport="stdio")
         elif transport in ["streamable-http", "sse"]:
-            logger.info(
-                f"Using {transport} transport on http://{http_config.get('host', '0.0.0.0')}:{http_config.get('port', 8888)}{http_config.get('path', '/mcp')}"
-            )
+            # Configuration is guaranteed by parse_server_config
+            host = http_config["host"]
+            port = http_config["port"]
+            path = http_config["path"]
+            log_level = http_config["log_level"].lower()
+
+            logger.info(f"Using {transport} transport on http://{host}:{port}{path}")
 
             # Create an ASGI app instance from FastMCP
-            mcp_app = mcp.http_app(
-                transport=transport, path=http_config.get("path", "/mcp")
-            )
+            mcp_app = mcp.http_app(transport=transport, path=path)
 
             # Create a Starlette app, injecting the lifespan context
             # and reusing routes and middleware from mcp_app
@@ -753,9 +755,9 @@ def run_server(transport: str, http_config: dict[str, Any]) -> None:
             # Run the ASGI app directly using Uvicorn
             uvicorn.run(
                 app,
-                host=http_config.get("host", "0.0.0.0"),
-                port=http_config.get("port", 8888),
-                log_level=http_config.get("log_level", "info").lower(),
+                host=host,
+                port=port,
+                log_level=log_level,
             )
         else:
             logger.error(f"Unknown transport: {transport}")
