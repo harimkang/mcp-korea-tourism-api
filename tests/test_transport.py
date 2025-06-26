@@ -1,11 +1,9 @@
 import pytest
-import argparse
-import os
 from unittest.mock import patch, MagicMock
 from starlette.testclient import TestClient
 from starlette.applications import Starlette
 
-from mcp_tourism.server import health_check
+from mcp_tourism.server import health_check, parse_server_config
 
 
 class TestTransportConfiguration:
@@ -23,42 +21,15 @@ class TestTransportConfiguration:
         ]:
             monkeypatch.delenv(var, raising=False)
 
-        # Mock argument parser
-        parser = argparse.ArgumentParser(description="Korea Tourism API MCP Server")
-        parser.add_argument(
-            "--transport", choices=["stdio", "streamable-http", "sse"], default=None
-        )
-        parser.add_argument("--host", type=str, default=None)
-        parser.add_argument("--port", type=int, default=None)
-        parser.add_argument(
-            "--log-level",
-            choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-            default=None,
-        )
-        parser.add_argument("--path", type=str, default=None)
+        # Test the actual function
+        transport, http_config = parse_server_config([])
 
-        # Test default configuration
-        args = parser.parse_args([])
-
-        transport = args.transport or os.environ.get("MCP_TRANSPORT", "stdio")
         assert transport == "stdio"
+        assert http_config == {}
 
     def test_command_line_argument_parsing(self):
         """Test command line argument parsing for transport configuration."""
-        parser = argparse.ArgumentParser(description="Korea Tourism API MCP Server")
-        parser.add_argument(
-            "--transport", choices=["stdio", "streamable-http", "sse"], default=None
-        )
-        parser.add_argument("--host", type=str, default=None)
-        parser.add_argument("--port", type=int, default=None)
-        parser.add_argument(
-            "--log-level",
-            choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-            default=None,
-        )
-        parser.add_argument("--path", type=str, default=None)
-
-        # Test with command line arguments
+        # Test with command line arguments using the actual function
         test_args = [
             "--transport",
             "streamable-http",
@@ -72,13 +43,13 @@ class TestTransportConfiguration:
             "/api/mcp",
         ]
 
-        args = parser.parse_args(test_args)
+        transport, http_config = parse_server_config(test_args)
 
-        assert args.transport == "streamable-http"
-        assert args.host == "0.0.0.0"
-        assert args.port == 3000
-        assert args.log_level == "DEBUG"
-        assert args.path == "/api/mcp"
+        assert transport == "streamable-http"
+        assert http_config["host"] == "0.0.0.0"
+        assert http_config["port"] == 3000
+        assert http_config["log_level"] == "DEBUG"
+        assert http_config["path"] == "/api/mcp"
 
     def test_environment_variable_configuration(self, monkeypatch):
         """Test environment variable configuration."""
@@ -89,12 +60,14 @@ class TestTransportConfiguration:
         monkeypatch.setenv("MCP_LOG_LEVEL", "INFO")
         monkeypatch.setenv("MCP_PATH", "/mcp")
 
-        # Test environment variable reading
-        assert os.environ.get("MCP_TRANSPORT") == "sse"
-        assert os.environ.get("MCP_HOST") == "127.0.0.1"
-        assert int(os.environ.get("MCP_PORT", "8000")) == 8080
-        assert os.environ.get("MCP_LOG_LEVEL") == "INFO"
-        assert os.environ.get("MCP_PATH") == "/mcp"
+        # Test the actual function
+        transport, http_config = parse_server_config([])
+
+        assert transport == "sse"
+        assert http_config["host"] == "127.0.0.1"
+        assert http_config["port"] == 8080
+        assert http_config["log_level"] == "INFO"
+        assert http_config["path"] == "/mcp"
 
     def test_command_line_overrides_environment(self, monkeypatch):
         """Test that command line arguments override environment variables."""
@@ -103,67 +76,99 @@ class TestTransportConfiguration:
         monkeypatch.setenv("MCP_HOST", "127.0.0.1")
         monkeypatch.setenv("MCP_PORT", "8080")
 
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
-            "--transport", choices=["stdio", "streamable-http", "sse"], default=None
+        # Test the actual function with CLI overrides
+        transport, http_config = parse_server_config(
+            ["--transport", "streamable-http", "--port", "3000"]
         )
-        parser.add_argument("--host", type=str, default=None)
-        parser.add_argument("--port", type=int, default=None)
-
-        # Parse command line arguments that should override env vars
-        args = parser.parse_args(["--transport", "streamable-http", "--port", "3000"])
-
-        # Test configuration priority
-        transport = args.transport or os.environ.get("MCP_TRANSPORT", "stdio")
-        host = args.host or os.environ.get("MCP_HOST", "127.0.0.1")
-        port = args.port or int(os.environ.get("MCP_PORT", "8000"))
 
         assert transport == "streamable-http"  # CLI override
-        assert host == "127.0.0.1"  # From env var
-        assert port == 3000  # CLI override
+        assert http_config["host"] == "127.0.0.1"  # From env var
+        assert http_config["port"] == 3000  # CLI override
 
-    def test_http_config_generation(self, monkeypatch):
-        """Test HTTP configuration generation for HTTP transports."""
+    def test_http_config_generation_for_streamable_http(self, monkeypatch):
+        """Test HTTP configuration generation for streamable-http transport."""
         # Set up test environment
-        monkeypatch.setenv("MCP_TRANSPORT", "streamable-http")
         monkeypatch.setenv("MCP_HOST", "0.0.0.0")
         monkeypatch.setenv("MCP_PORT", "8000")
         monkeypatch.setenv("MCP_LOG_LEVEL", "INFO")
         monkeypatch.setenv("MCP_PATH", "/mcp")
 
-        transport = os.environ.get("MCP_TRANSPORT", "stdio")
+        # Test the actual function
+        transport, http_config = parse_server_config(["--transport", "streamable-http"])
 
-        # Test HTTP config generation
-        http_config = {}
-        if transport in ["streamable-http", "sse"]:
-            http_config.update(
-                {
-                    "host": os.environ.get("MCP_HOST", "127.0.0.1"),
-                    "port": int(os.environ.get("MCP_PORT", "8000")),
-                    "log_level": os.environ.get("MCP_LOG_LEVEL", "INFO"),
-                    "path": os.environ.get("MCP_PATH", "/mcp"),
-                }
-            )
-
+        assert transport == "streamable-http"
         assert http_config["host"] == "0.0.0.0"
         assert http_config["port"] == 8000
         assert http_config["log_level"] == "INFO"
         assert http_config["path"] == "/mcp"
 
+    def test_http_config_generation_for_sse(self, monkeypatch):
+        """Test HTTP configuration generation for SSE transport."""
+        # Clear environment variables to test defaults
+        for var in ["MCP_HOST", "MCP_PORT", "MCP_LOG_LEVEL", "MCP_PATH"]:
+            monkeypatch.delenv(var, raising=False)
+
+        # Test the actual function
+        transport, http_config = parse_server_config(["--transport", "sse"])
+
+        assert transport == "sse"
+        assert http_config["host"] == "127.0.0.1"  # Default
+        assert http_config["port"] == 8000  # Default
+        assert http_config["log_level"] == "INFO"  # Default
+        assert http_config["path"] == "/mcp"  # Default
+
     def test_stdio_transport_no_http_config(self):
         """Test that stdio transport doesn't generate HTTP config."""
-        transport = "stdio"
+        # Test the actual function
+        transport, http_config = parse_server_config(["--transport", "stdio"])
 
-        http_config = {}
-        if transport in ["streamable-http", "sse"]:
-            http_config.update(
-                {
-                    "host": "0.0.0.0",
-                    "port": 8000,
-                }
-            )
-
+        assert transport == "stdio"
         assert http_config == {}
+
+    def test_invalid_transport_choice(self):
+        """Test that invalid transport choices raise SystemExit."""
+        with pytest.raises(SystemExit):
+            parse_server_config(["--transport", "invalid-transport"])
+
+    def test_invalid_port_type(self):
+        """Test that invalid port type raises SystemExit."""
+        with pytest.raises(SystemExit):
+            parse_server_config(["--port", "not-a-number"])
+
+    def test_invalid_log_level(self):
+        """Test that invalid log level choices raise SystemExit."""
+        with pytest.raises(SystemExit):
+            parse_server_config(["--log-level", "INVALID"])
+
+    def test_environment_variable_port_conversion_error(self, monkeypatch):
+        """Test error handling when environment port variable is invalid."""
+        monkeypatch.setenv("MCP_PORT", "not-a-number")
+
+        with pytest.raises(ValueError):
+            parse_server_config(["--transport", "streamable-http"])
+
+    def test_all_cli_arguments_provided(self):
+        """Test configuration when all CLI arguments are provided."""
+        args = [
+            "--transport",
+            "sse",
+            "--host",
+            "192.168.1.100",
+            "--port",
+            "9999",
+            "--log-level",
+            "WARNING",
+            "--path",
+            "/custom/mcp/path",
+        ]
+
+        transport, http_config = parse_server_config(args)
+
+        assert transport == "sse"
+        assert http_config["host"] == "192.168.1.100"
+        assert http_config["port"] == 9999
+        assert http_config["log_level"] == "WARNING"
+        assert http_config["path"] == "/custom/mcp/path"
 
 
 class TestHealthCheckEndpoint:
@@ -242,94 +247,90 @@ class TestTransportValidation:
     """Test transport validation and error handling."""
 
     def test_valid_transport_choices(self):
-        """Test that parser accepts valid transport choices."""
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--transport", choices=["stdio", "streamable-http", "sse"])
-
+        """Test that parse_server_config accepts valid transport choices."""
         # Test valid choices
         for transport in ["stdio", "streamable-http", "sse"]:
-            args = parser.parse_args(["--transport", transport])
-            assert args.transport == transport
+            result_transport, _ = parse_server_config(["--transport", transport])
+            assert result_transport == transport
 
     def test_invalid_transport_choice(self):
         """Test that parser rejects invalid transport choices."""
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--transport", choices=["stdio", "streamable-http", "sse"])
-
         # Test invalid choice
         with pytest.raises(SystemExit):
-            parser.parse_args(["--transport", "invalid-transport"])
+            parse_server_config(["--transport", "invalid-transport"])
 
     def test_port_type_validation(self):
         """Test that parser validates port as integer."""
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--port", type=int)
-
         # Test valid port
-        args = parser.parse_args(["--port", "8000"])
-        assert args.port == 8000
+        _, http_config = parse_server_config(
+            ["--transport", "streamable-http", "--port", "8000"]
+        )
+        assert http_config["port"] == 8000
 
         # Test invalid port
         with pytest.raises(SystemExit):
-            parser.parse_args(["--port", "not-a-number"])
+            parse_server_config(["--port", "not-a-number"])
 
     def test_log_level_choices(self):
         """Test that parser accepts valid log level choices."""
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
-            "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-        )
-
         # Test valid choices
         for level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
-            args = parser.parse_args(["--log-level", level])
-            assert args.log_level == level
+            _, http_config = parse_server_config(
+                ["--transport", "streamable-http", "--log-level", level]
+            )
+            assert http_config["log_level"] == level
+
+    def test_negative_port_value(self):
+        """Test that negative port values are handled gracefully."""
+        # Parser should accept negative values but they may not be practical
+        _, http_config = parse_server_config(
+            ["--transport", "streamable-http", "--port", "-1"]
+        )
+        assert http_config["port"] == -1
+
+    def test_zero_port_value(self):
+        """Test that zero port value is handled gracefully."""
+        _, http_config = parse_server_config(
+            ["--transport", "streamable-http", "--port", "0"]
+        )
+        assert http_config["port"] == 0
+
+    def test_large_port_value(self):
+        """Test that large port values are handled gracefully."""
+        _, http_config = parse_server_config(
+            ["--transport", "streamable-http", "--port", "65535"]
+        )
+        assert http_config["port"] == 65535
 
 
 class TestServerIntegration:
     """Test server integration with different transports."""
 
-    @pytest.mark.asyncio
-    async def test_mcp_server_with_stdio_transport(self, monkeypatch):
+    def test_mcp_server_with_stdio_transport(self, monkeypatch):
         """Test that MCP server can be configured with stdio transport."""
         # Set up environment
         monkeypatch.setenv("KOREA_TOURISM_API_KEY", "test-key")
         monkeypatch.setenv("MCP_TRANSPORT", "stdio")
 
-        # Mock the actual server run to avoid starting real server
-        with patch("mcp_tourism.server.mcp.run") as mock_run:
-            # Import and run the server configuration logic (without actually running)
-            transport = os.environ.get("MCP_TRANSPORT", "stdio")
+        # Test the actual function
+        transport, http_config = parse_server_config([])
 
-            if transport == "stdio":
-                # This would normally call mcp.run(transport="stdio")
-                mock_run.assert_not_called()  # Since we're just testing the logic
-                assert transport == "stdio"
+        assert transport == "stdio"
+        assert http_config == {}
 
     def test_http_config_preparation(self, monkeypatch):
         """Test HTTP configuration preparation for HTTP transports."""
         # Set up environment for HTTP transport
-        monkeypatch.setenv("MCP_TRANSPORT", "streamable-http")
         monkeypatch.setenv("MCP_HOST", "0.0.0.0")
         monkeypatch.setenv("MCP_PORT", "3000")
         monkeypatch.setenv("MCP_LOG_LEVEL", "DEBUG")
         monkeypatch.setenv("MCP_PATH", "/api/mcp")
 
-        transport = os.environ.get("MCP_TRANSPORT", "stdio")
-
-        # Prepare HTTP config like in the actual server
-        http_config = {}
-        if transport in ["streamable-http", "sse"]:
-            http_config.update(
-                {
-                    "host": os.environ.get("MCP_HOST", "127.0.0.1"),
-                    "port": int(os.environ.get("MCP_PORT", "8000")),
-                    "log_level": os.environ.get("MCP_LOG_LEVEL", "INFO"),
-                    "path": os.environ.get("MCP_PATH", "/mcp"),
-                }
-            )
+        # Test the actual function
+        transport, http_config = parse_server_config(["--transport", "streamable-http"])
 
         # Verify configuration
+        assert transport == "streamable-http"
         assert http_config["host"] == "0.0.0.0"
         assert http_config["port"] == 3000
         assert http_config["log_level"] == "DEBUG"
@@ -408,18 +409,14 @@ class TestEnvironmentVariablePriority:
         ]:
             monkeypatch.delenv(var, raising=False)
 
-        # Test fallback behavior
-        transport = os.environ.get("MCP_TRANSPORT", "stdio")
-        host = os.environ.get("MCP_HOST", "127.0.0.1")
-        port = int(os.environ.get("MCP_PORT", "8000"))
-        path = os.environ.get("MCP_PATH", "/mcp")
-        log_level = os.environ.get("MCP_LOG_LEVEL", "INFO")
+        # Test the actual function with HTTP transport to verify defaults
+        transport, http_config = parse_server_config(["--transport", "streamable-http"])
 
-        assert transport == "stdio"
-        assert host == "127.0.0.1"
-        assert port == 8000
-        assert path == "/mcp"
-        assert log_level == "INFO"
+        assert transport == "streamable-http"
+        assert http_config["host"] == "127.0.0.1"  # Default
+        assert http_config["port"] == 8000  # Default
+        assert http_config["path"] == "/mcp"  # Default
+        assert http_config["log_level"] == "INFO"  # Default
 
     def test_partial_environment_variables(self, monkeypatch):
         """Test behavior when only some environment variables are set."""
@@ -431,15 +428,52 @@ class TestEnvironmentVariablePriority:
         for var in ["MCP_HOST", "MCP_PATH", "MCP_LOG_LEVEL"]:
             monkeypatch.delenv(var, raising=False)
 
-        # Test mixed configuration
-        transport = os.environ.get("MCP_TRANSPORT", "stdio")
-        host = os.environ.get("MCP_HOST", "127.0.0.1")
-        port = int(os.environ.get("MCP_PORT", "8000"))
-        path = os.environ.get("MCP_PATH", "/mcp")
-        log_level = os.environ.get("MCP_LOG_LEVEL", "INFO")
+        # Test the actual function
+        transport, http_config = parse_server_config([])
 
         assert transport == "sse"  # From env var
-        assert host == "127.0.0.1"  # Default fallback
-        assert port == 9000  # From env var
-        assert path == "/mcp"  # Default fallback
-        assert log_level == "INFO"  # Default fallback
+        assert http_config["host"] == "127.0.0.1"  # Default fallback
+        assert http_config["port"] == 9000  # From env var
+        assert http_config["path"] == "/mcp"  # Default fallback
+        assert http_config["log_level"] == "INFO"  # Default fallback
+
+    def test_environment_variable_empty_values(self, monkeypatch):
+        """Test behavior when environment variables are set to empty values."""
+        # Set environment variables to empty strings
+        monkeypatch.setenv("MCP_HOST", "")
+        monkeypatch.setenv("MCP_PATH", "")
+        monkeypatch.setenv("MCP_LOG_LEVEL", "")
+
+        # Test the actual function
+        transport, http_config = parse_server_config(["--transport", "streamable-http"])
+
+        assert transport == "streamable-http"
+        # Empty string should be used instead of defaults
+        assert http_config["host"] == ""
+        assert http_config["path"] == ""
+        assert http_config["log_level"] == ""
+        assert http_config["port"] == 8000  # This should still be default since not set
+
+    def test_cli_arguments_override_empty_env_vars(self, monkeypatch):
+        """Test that CLI arguments override empty environment variables."""
+        # Set environment variables to empty strings
+        monkeypatch.setenv("MCP_HOST", "")
+        monkeypatch.setenv("MCP_PATH", "")
+
+        # Test with CLI overrides
+        transport, http_config = parse_server_config(
+            [
+                "--transport",
+                "streamable-http",
+                "--host",
+                "192.168.1.1",
+                "--path",
+                "/custom/path",
+            ]
+        )
+
+        assert transport == "streamable-http"
+        assert http_config["host"] == "192.168.1.1"  # CLI override
+        assert http_config["path"] == "/custom/path"  # CLI override
+        assert http_config["port"] == 8000  # Default
+        assert http_config["log_level"] == "INFO"  # Default

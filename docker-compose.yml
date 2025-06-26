@@ -27,11 +27,6 @@ services:
       - "8000:8000"
     environment:
       - KOREA_TOURISM_API_KEY=${KOREA_TOURISM_API_KEY}
-      - MCP_TRANSPORT=streamable-http
-      - MCP_HOST=0.0.0.0
-      - MCP_PORT=8000
-      - MCP_PATH=/mcp
-      - MCP_LOG_LEVEL=INFO
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -57,11 +52,6 @@ services:
       - "8080:8080"
     environment:
       - KOREA_TOURISM_API_KEY=${KOREA_TOURISM_API_KEY}
-      - MCP_TRANSPORT=sse
-      - MCP_HOST=0.0.0.0
-      - MCP_PORT=8080
-      - MCP_PATH=/mcp
-      - MCP_LOG_LEVEL=INFO
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -86,11 +76,6 @@ services:
       - "3000:3000"
     environment:
       - KOREA_TOURISM_API_KEY=${KOREA_TOURISM_API_KEY}
-      - MCP_TRANSPORT=streamable-http
-      - MCP_HOST=0.0.0.0
-      - MCP_PORT=3000
-      - MCP_PATH=/api/mcp
-      - MCP_LOG_LEVEL=DEBUG
       # Additional tourism API settings for development
       - MCP_TOURISM_DEFAULT_LANGUAGE=en
       - MCP_TOURISM_CACHE_TTL=3600

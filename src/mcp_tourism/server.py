@@ -644,7 +644,18 @@ async def health_check(request: Request) -> JSONResponse:
         )
 
 
-if __name__ == "__main__":
+def parse_server_config(args: list[str] | None = None) -> tuple[str, dict[str, Any]]:
+    """
+    Parse server configuration from command line arguments and environment variables.
+
+    Args:
+        args: Command line arguments list. If None, uses sys.argv.
+
+    Returns:
+        Tuple of (transport, http_config) where:
+        - transport: The selected transport protocol
+        - http_config: Dictionary of HTTP configuration options (empty for stdio)
+    """
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Korea Tourism API MCP Server")
     parser.add_argument(
@@ -678,23 +689,37 @@ if __name__ == "__main__":
         help="Path for HTTP endpoints (default: from environment or /mcp)",
     )
 
-    args = parser.parse_args()
+    parsed_args = parser.parse_args(args)
 
     # Determine transport and configuration from args or environment variables
-    transport = args.transport or os.environ.get("MCP_TRANSPORT", "stdio")
+    transport = parsed_args.transport or os.environ.get("MCP_TRANSPORT", "stdio")
 
     # Configuration for HTTP transports
     http_config = {}
     if transport in ["streamable-http", "sse"]:
         http_config.update(
             {
-                "host": args.host or os.environ.get("MCP_HOST", "127.0.0.1"),
-                "port": args.port or int(os.environ.get("MCP_PORT", "8000")),
-                "log_level": args.log_level or os.environ.get("MCP_LOG_LEVEL", "INFO"),
-                "path": args.path or os.environ.get("MCP_PATH", "/mcp"),
+                "host": parsed_args.host or os.environ.get("MCP_HOST", "127.0.0.1"),
+                "port": parsed_args.port
+                if parsed_args.port is not None
+                else int(os.environ.get("MCP_PORT", "8000")),
+                "log_level": parsed_args.log_level
+                or os.environ.get("MCP_LOG_LEVEL", "INFO"),
+                "path": parsed_args.path or os.environ.get("MCP_PATH", "/mcp"),
             }
         )
 
+    return transport, http_config
+
+
+def run_server(transport: str, http_config: dict[str, Any]) -> None:
+    """
+    Run the MCP server with the given configuration.
+
+    Args:
+        transport: Transport protocol to use
+        http_config: HTTP configuration dictionary
+    """
     # Log the configuration
     logger.info(f"Starting Korea Tourism API MCP Server with transport: {transport}")
     if http_config:
@@ -718,3 +743,8 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Server failed to start: {e}")
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    transport, http_config = parse_server_config()
+    run_server(transport, http_config)
