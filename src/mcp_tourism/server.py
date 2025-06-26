@@ -7,6 +7,8 @@ import json
 import argparse
 import sys
 from typing import Dict, Any, Optional
+import uvicorn
+from starlette.applications import Starlette
 from fastmcp import FastMCP
 from mcp.types import EmbeddedResource, TextResourceContents
 from mcp_tourism.api_client import KoreaTourismApiClient, CONTENTTYPE_ID_MAP
@@ -732,9 +734,29 @@ def run_server(transport: str, http_config: dict[str, Any]) -> None:
             mcp.run(transport="stdio")
         elif transport in ["streamable-http", "sse"]:
             logger.info(
-                f"Using {transport} transport on http://{http_config['host']}:{http_config['port']}{http_config['path']}"
+                f"Using {transport} transport on http://{http_config.get('host', '0.0.0.0')}:{http_config.get('port', 8888)}{http_config.get('path', '/mcp')}"
             )
-            mcp.run(transport=transport, **http_config)
+
+            # Create an ASGI app instance from FastMCP
+            mcp_app = mcp.http_app(
+                transport=transport, path=http_config.get("path", "/mcp")
+            )
+
+            # Create a Starlette app, injecting the lifespan context
+            # and reusing routes and middleware from mcp_app
+            app = Starlette(
+                routes=mcp_app.routes,
+                middleware=mcp_app.user_middleware,
+                lifespan=mcp_app.lifespan,
+            )
+
+            # Run the ASGI app directly using Uvicorn
+            uvicorn.run(
+                app,
+                host=http_config.get("host", "0.0.0.0"),
+                port=http_config.get("port", 8888),
+                log_level=http_config.get("log_level", "info").lower(),
+            )
         else:
             logger.error(f"Unknown transport: {transport}")
             sys.exit(1)
