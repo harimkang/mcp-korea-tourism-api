@@ -85,10 +85,28 @@ npx -y @smithery/cli install @harimkang/mcp-korea-tourism-api --client claude
 
 3.  **Install dependencies and run the server:**
     This command uses `uv` to install dependencies based on `uv.lock` (if available) or `pyproject.toml` and then runs the server module.
+
     ```bash
+    # Install Dependency with uv
+    uv sync
+
+    # Default: stdio transport (for MCP clients)
+    uv run -m mcp_tourism.server
+
+    # HTTP transport for web applications
+    uv run -m mcp_tourism.server --transport streamable-http --host 127.0.0.1 --port 8000
+
+    # SSE transport for real-time applications
+    uv run -m mcp_tourism.server --transport sse --host 127.0.0.1 --port 8080
+
+    # Using environment variables
+    export MCP_TRANSPORT=streamable-http
+    export MCP_HOST=0.0.0.0
+    export MCP_PORT=3000
     uv run -m mcp_tourism.server
     ```
-    The server will start and listen for MCP requests via standard input/output (stdio).
+
+    The server will start and listen for MCP requests via the specified transport protocol.
 
 ### Option 2: Using Docker (Recommended for isolated environment/deployment)
 
@@ -98,58 +116,156 @@ npx -y @smithery/cli install @harimkang/mcp-korea-tourism-api --client claude
     cd mcp-korea-tourism-api
     ```
 2.  **Build the Docker Image:**
-    Replace `"YOUR_KTO_API_KEY"` with the actual key you obtained. This command builds the image using the provided `Dockerfile`, passing the API key securely as a build argument.
+    You can build the image with different transport configurations:
 
     ```bash
-    >>> docker build -t mcp-korea-tourism-api .
+    # Default build (stdio transport)
+    docker build -t mcp-korea-tourism-api .
 
-    [+] Building 2.7s (13/13) FINISHED                                                 docker:desktop-linux
-    => [internal] load build definition from Dockerfile                                               0.0s
-    => => transferring dockerfile: 1.46kB                                                             0.0s
-    => resolve image config for docker-image://docker.io/docker/dockerfile:1                          0.9s
-    => CACHED docker-image://docker.io/docker/dockerfile:1@sha256:4c68376a702446fc3c79af22de146a148b  0.0s
-    => [internal] load metadata for docker.io/library/python:3.12-slim                                0.7s
-    => [internal] load .dockerignore                                                                  0.0s
-    => => transferring context: 864B                                                                  0.0s
-    => [1/6] FROM docker.io/library/python:3.12-slim@sha256:85824326bc4ae27a1abb5bc0dd9e08847aa5fe73  0.0s
-    => [internal] load build context                                                                  0.0s
-    => => transferring context: 7.06kB                                                                0.0s
-    => CACHED [2/6] RUN pip install --no-cache-dir uv                                                 0.0s
-    => CACHED [3/6] WORKDIR /app                                                                      0.0s
-    => CACHED [4/6] COPY pyproject.toml uv.lock ./                                                    0.0s
-    => [5/6] RUN uv sync --frozen                                                                     0.8s
-    => [6/6] COPY . .                                                                                 0.0s
-    => exporting to image                                                                             0.1s
-    => => exporting layers                                                                            0.1s
-    => => writing image sha256:d7d074e85a66a257d00bad4043ea0f5ba8acf6b7c6ef26560c6904bf3ec4d5ff       0.0s
-    => => naming to docker.io/library/mcp-korea-tourism                                               0.0s
+    # Build with HTTP transport configuration
+    docker build -t mcp-korea-tourism-api \
+      --build-arg MCP_TRANSPORT=streamable-http \
+      --build-arg MCP_HOST=0.0.0.0 \
+      --build-arg MCP_PORT=8000 \
+      --build-arg MCP_PATH=/mcp \
+      --build-arg MCP_LOG_LEVEL=INFO \
+      .
 
-    >>> docker images
-
-    REPOSITORY                              TAG                IMAGE ID       CREATED          SIZE
-    mcp-korea-tourism                       latest             d7d074e85a66   12 seconds ago   215MB
+    # Build with SSE transport configuration
+    docker build -t mcp-korea-tourism-api \
+      --build-arg MCP_TRANSPORT=sse \
+      --build-arg MCP_HOST=0.0.0.0 \
+      --build-arg MCP_PORT=8080 \
+      .
     ```
-    - `-t mcp-korea-tourism-api`: Tags the built image with the name `mcp-korea-tourism-api`.
-    - `.`: Specifies the current directory as the build context.
 
 3.  **Run the Docker Container:**
-    You can run the container in interactive mode for testing or detached mode for background operation.
-    - **Interactive Mode (for manual testing):**
+    You can run the container with different transport configurations:
+    - **Stdio Transport (Default - for MCP clients):**
 
       ```bash
-      docker run --rm -it -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" mcp-korea-tourism-api
+      docker run --rm -it \
+        -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" \
+        mcp-korea-tourism-api
       ```
-      - `--rm`: Automatically removes the container when it exits.
-      - `-it`: Runs in interactive mode, attaching your terminal to the container's stdio.
-      - `-e KOREA_TOURISM_API_KEY=...`: Sets the API key environment variable at runtime (alternative to build-arg).
 
-    - **Detached Mode (for background):**
+    - **HTTP Transport (for web applications):**
+
       ```bash
-      docker run --name tourism-mcp -d -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" mcp-korea-tourism-api
+      # Using runtime environment variables
+      docker run --rm -p 8000:8000 \
+        -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" \
+        -e MCP_TRANSPORT=streamable-http \
+        -e MCP_HOST=0.0.0.0 \
+        -e MCP_PORT=8000 \
+        mcp-korea-tourism-api
+
+      # Check health: curl http://localhost:8000/health
       ```
-      - `--name tourism-mcp`: Assigns a name to the container.
-      - `-d`: Runs the container in detached (background) mode.
-      - You can view logs using `docker logs tourism-mcp`.
+
+    - **SSE Transport (for real-time applications):**
+
+      ```bash
+      docker run --rm -p 8080:8080 \
+        -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" \
+        -e MCP_TRANSPORT=sse \
+        -e MCP_HOST=0.0.0.0 \
+        -e MCP_PORT=8080 \
+        mcp-korea-tourism-api
+      ```
+
+    - **Using Docker Compose (Recommended):**
+
+      ```bash
+      # Copy and configure environment variables
+      cp docker.env.example .env
+      # Edit .env file with your API key and preferred settings
+
+      # Run with HTTP transport (default profile)
+      docker-compose up mcp-tourism-http
+
+      # Run with SSE transport
+      docker-compose --profile sse up mcp-tourism-sse
+
+      # Run development setup with debug logging
+      docker-compose --profile dev up mcp-tourism-dev
+      ```
+
+## 🔧 Transport Configuration
+
+The Korea Tourism API MCP Server supports multiple transport protocols to accommodate different use cases:
+
+### Available Transports
+
+1. **`stdio`** (Default): Standard input/output transport for direct MCP client integration
+   - Best for: Claude Desktop, Cursor, and other MCP-compatible AI assistants
+   - Configuration: No additional setup required
+
+2. **`streamable-http`**: HTTP-based transport for web applications
+   - Best for: Web applications, REST API integration, load balancers
+   - Features: HTTP endpoints, health checks, JSON responses
+   - Default endpoint: `http://localhost:8000/mcp`
+
+3. **`sse`**: Server-Sent Events transport for real-time applications
+   - Best for: Real-time web applications, event-driven architectures
+   - Features: Real-time streaming, persistent connections
+   - Default endpoint: `http://localhost:8080/mcp`
+
+### Configuration Options
+
+You can configure the server using command line arguments or environment variables:
+
+| Setting   | CLI Argument  | Environment Variable | Default     | Description                      |
+| --------- | ------------- | -------------------- | ----------- | -------------------------------- |
+| Transport | `--transport` | `MCP_TRANSPORT`      | `stdio`     | Transport protocol to use        |
+| Host      | `--host`      | `MCP_HOST`           | `127.0.0.1` | Host address for HTTP transports |
+| Port      | `--port`      | `MCP_PORT`           | `8000`      | Port for HTTP transports         |
+| Path      | `--path`      | `MCP_PATH`           | `/mcp`      | Path for HTTP endpoints          |
+| Log Level | `--log-level` | `MCP_LOG_LEVEL`      | `INFO`      | Logging level                    |
+
+### Command Line Examples
+
+```bash
+# Get help for all available options
+python -m mcp_tourism.server --help
+
+# Run with HTTP transport on custom port
+python -m mcp_tourism.server --transport streamable-http --port 3000 --log-level DEBUG
+
+# Run with SSE transport
+python -m mcp_tourism.server --transport sse --host 0.0.0.0 --port 8080
+```
+
+### Environment Variable Examples
+
+```bash
+# Set environment variables
+export MCP_TRANSPORT=streamable-http
+export MCP_HOST=0.0.0.0
+export MCP_PORT=8000
+export MCP_LOG_LEVEL=INFO
+export KOREA_TOURISM_API_KEY="your_api_key_here"
+
+# Run the server
+python -m mcp_tourism.server
+```
+
+### Health Check
+
+For HTTP and SSE transports, a health check endpoint is available at `/health`:
+
+```bash
+# Check server health
+curl http://localhost:8000/health
+
+# Example response
+{
+  "status": "healthy",
+  "service": "Korea Tourism API MCP Server",
+  "transport": "streamable-http",
+  "timestamp": 1640995200.0
+}
+```
 
 ## 🛠️ Integrating with Cursor
 

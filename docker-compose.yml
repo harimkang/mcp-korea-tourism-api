@@ -1,0 +1,98 @@
+version: "3.8"
+
+services:
+  # Default stdio transport (for MCP client connections)
+  mcp-tourism-stdio:
+    build: .
+    container_name: korea-tourism-mcp-stdio
+    environment:
+      - KOREA_TOURISM_API_KEY=${KOREA_TOURISM_API_KEY}
+      - MCP_TRANSPORT=stdio
+      - MCP_LOG_LEVEL=INFO
+    profiles:
+      - stdio
+
+  # HTTP transport for web applications
+  mcp-tourism-http:
+    build:
+      context: .
+      args:
+        - MCP_TRANSPORT=streamable-http
+        - MCP_HOST=0.0.0.0
+        - MCP_PORT=8000
+        - MCP_PATH=/mcp
+        - MCP_LOG_LEVEL=INFO
+    container_name: korea-tourism-mcp-http
+    ports:
+      - "8000:8000"
+    environment:
+      - KOREA_TOURISM_API_KEY=${KOREA_TOURISM_API_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    profiles:
+      - http
+      - default
+
+  # SSE transport for real-time applications
+  mcp-tourism-sse:
+    build:
+      context: .
+      args:
+        - MCP_TRANSPORT=sse
+        - MCP_HOST=0.0.0.0
+        - MCP_PORT=8080
+        - MCP_PATH=/mcp
+        - MCP_LOG_LEVEL=INFO
+    container_name: korea-tourism-mcp-sse
+    ports:
+      - "8080:8080"
+    environment:
+      - KOREA_TOURISM_API_KEY=${KOREA_TOURISM_API_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    profiles:
+      - sse
+
+  # Development setup with debug logging
+  mcp-tourism-dev:
+    build:
+      context: .
+      args:
+        - MCP_TRANSPORT=streamable-http
+        - MCP_HOST=0.0.0.0
+        - MCP_PORT=3000
+        - MCP_PATH=/api/mcp
+        - MCP_LOG_LEVEL=DEBUG
+    container_name: korea-tourism-mcp-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - KOREA_TOURISM_API_KEY=${KOREA_TOURISM_API_KEY}
+      # Additional tourism API settings for development
+      - MCP_TOURISM_DEFAULT_LANGUAGE=en
+      - MCP_TOURISM_CACHE_TTL=3600
+      - MCP_TOURISM_RATE_LIMIT_CALLS=10
+      - MCP_TOURISM_RATE_LIMIT_PERIOD=1
+      - MCP_TOURISM_CONCURRENCY_LIMIT=20
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    profiles:
+      - dev
+
+networks:
+  default:
+    name: korea-tourism-mcp-network
