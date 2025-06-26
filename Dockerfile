@@ -4,9 +4,11 @@
 # Use the Python version confirmed from .python-version
 FROM python:3.12-slim
 
-# Install uv
+# Install uv and curl for health checks
 # --no-cache-dir reduces image size
-RUN pip install --no-cache-dir uv
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir uv
 
 # Set the working directory in the container
 WORKDIR /app
@@ -30,14 +32,35 @@ COPY . .
 # --system is required because we are not in a virtual environment
 RUN uv pip install . --no-deps --system
 
+# Build arguments for configuration (can be set during docker build)
+ARG MCP_TRANSPORT=stdio
+ARG MCP_HOST=0.0.0.0
+ARG MCP_PORT=8000
+ARG MCP_PATH=/mcp
+ARG MCP_LOG_LEVEL=INFO
+
+# Set environment variables from build args (these can be overridden at runtime)
+ENV MCP_TRANSPORT=${MCP_TRANSPORT}
+ENV MCP_HOST=${MCP_HOST}
+ENV MCP_PORT=${MCP_PORT}
+ENV MCP_PATH=${MCP_PATH}
+ENV MCP_LOG_LEVEL=${MCP_LOG_LEVEL}
+
 # Set the API key as an environment variable
 # IMPORTANT: It's strongly recommended to pass the API key securely at runtime using -e.
 # Example runtime command: docker run -e KOREA_TOURISM_API_KEY="YOUR_ACTUAL_API_KEY" ...
 # ENV KOREA_TOURISM_API_KEY="YOUR_ACTUAL_API_KEY" # Avoid hardcoding if possible
 
-# Expose the port the MCP server might run on (if applicable)
-# Adjust the port number if your server uses a different one.
-# EXPOSE 8000
+# Expose common ports (8000 is default, but can be changed at runtime)
+EXPOSE 8000 8080 3000
+
+# Create a health check for HTTP transports
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD if [ "$MCP_TRANSPORT" = "stdio" ]; then \
+            echo "stdio transport - health check passed"; \
+        else \
+            curl -f http://localhost:${MCP_PORT}/health || exit 1; \
+        fi
 
 # Command to run the application
 # Use python -m directly instead of uv run to avoid creating a virtual env at runtime

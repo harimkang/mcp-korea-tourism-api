@@ -85,10 +85,28 @@ npx -y @smithery/cli install @harimkang/mcp-korea-tourism-api --client claude
 
 3.  **의존성 설치 및 서버 실행:**
     이 명령어는 `uv`를 사용하여 `uv.lock` (사용 가능한 경우) 또는 `pyproject.toml`을 기반으로 의존성을 설치한 다음 서버 모듈을 실행합니다.
+
     ```bash
+    # 의존성 설치
+    uv sync
+
+    # 기본값: stdio 전송 방식 (MCP 클라이언트용)
+    uv run -m mcp_tourism.server
+
+    # HTTP 전송 방식 (웹 애플리케이션용)
+    uv run -m mcp_tourism.server --transport streamable-http --host 127.0.0.1 --port 8000
+
+    # SSE 전송 방식 (실시간 애플리케이션용)
+    uv run -m mcp_tourism.server --transport sse --host 127.0.0.1 --port 8080
+
+    # 환경 변수 사용
+    export MCP_TRANSPORT=streamable-http
+    export MCP_HOST=0.0.0.0
+    export MCP_PORT=3000
     uv run -m mcp_tourism.server
     ```
-    서버가 시작되고 표준 입력/출력(stdio)을 통해 MCP 요청을 수신 대기합니다.
+
+    서버가 시작되고 지정된 전송 프로토콜을 통해 MCP 요청을 수신 대기합니다.
 
 ### 옵션 2: Docker 사용 (격리된 환경/배포에 권장)
 
@@ -98,58 +116,156 @@ npx -y @smithery/cli install @harimkang/mcp-korea-tourism-api --client claude
     cd mcp-korea-tourism-api
     ```
 2.  **Docker 이미지 빌드:**
-    `"YOUR_KTO_API_KEY"`를 발급받은 실제 키로 바꾸세요. 이 명령어는 제공된 `Dockerfile`을 사용하여 이미지를 빌드하며, API 키를 빌드 인수를 통해 안전하게 전달합니다.
+    다양한 전송 구성으로 이미지를 빌드할 수 있습니다:
 
     ```bash
-    >>> docker build -t mcp-korea-tourism-api .
+    # 기본 빌드 (stdio 전송 방식)
+    docker build -t mcp-korea-tourism-api .
 
-    [+] Building 2.7s (13/13) FINISHED                                                 docker:desktop-linux
-    => [internal] load build definition from Dockerfile                                               0.0s
-    => => transferring dockerfile: 1.46kB                                                             0.0s
-    => resolve image config for docker-image://docker.io/docker/dockerfile:1                          0.9s
-    => CACHED docker-image://docker.io/docker/dockerfile:1@sha256:4c68376a702446fc3c79af22de146a148b  0.0s
-    => [internal] load metadata for docker.io/library/python:3.12-slim                                0.7s
-    => [internal] load .dockerignore                                                                  0.0s
-    => => transferring context: 864B                                                                  0.0s
-    => [1/6] FROM docker.io/library/python:3.12-slim@sha256:85824326bc4ae27a1abb5bc0dd9e08847aa5fe73  0.0s
-    => [internal] load build context                                                                  0.0s
-    => => transferring context: 7.06kB                                                                0.0s
-    => CACHED [2/6] RUN pip install --no-cache-dir uv                                                 0.0s
-    => CACHED [3/6] WORKDIR /app                                                                      0.0s
-    => CACHED [4/6] COPY pyproject.toml uv.lock ./                                                    0.0s
-    => [5/6] RUN uv sync --frozen                                                                     0.8s
-    => [6/6] COPY . .                                                                                 0.0s
-    => exporting to image                                                                             0.1s
-    => => exporting layers                                                                            0.1s
-    => => writing image sha256:d7d074e85a66a257d00bad4043ea0f5ba8acf6b7c6ef26560c6904bf3ec4d5ff       0.0s
-    => => naming to docker.io/library/mcp-korea-tourism                                               0.0s
+    # HTTP 전송 구성으로 빌드
+    docker build -t mcp-korea-tourism-api \
+      --build-arg MCP_TRANSPORT=streamable-http \
+      --build-arg MCP_HOST=0.0.0.0 \
+      --build-arg MCP_PORT=8000 \
+      --build-arg MCP_PATH=/mcp \
+      --build-arg MCP_LOG_LEVEL=INFO \
+      .
 
-    >>> docker images
-
-    REPOSITORY                              TAG                IMAGE ID       CREATED          SIZE
-    mcp-korea-tourism                       latest             d7d074e85a66   12 seconds ago   215MB
+    # SSE 전송 구성으로 빌드
+    docker build -t mcp-korea-tourism-api \
+      --build-arg MCP_TRANSPORT=sse \
+      --build-arg MCP_HOST=0.0.0.0 \
+      --build-arg MCP_PORT=8080 \
+      .
     ```
-    - `-t mcp-korea-tourism-api`: 빌드된 이미지에 `mcp-korea-tourism-api`라는 이름을 태그합니다.
-    - `.`: 현재 디렉토리를 빌드 컨텍스트로 지정합니다.
 
 3.  **Docker 컨테이너 실행:**
-    테스트를 위해 대화형 모드로 실행하거나 백그라운드 작업을 위해 분리 모드로 실행할 수 있습니다.
-    - **대화형 모드 (수동 테스트용):**
+    다양한 전송 구성으로 컨테이너를 실행할 수 있습니다:
+    - **Stdio 전송 방식 (기본값 - MCP 클라이언트용):**
 
       ```bash
-      docker run --rm -it -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" mcp-korea-tourism-api
+      docker run --rm -it \
+        -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" \
+        mcp-korea-tourism-api
       ```
-      - `--rm`: 컨테이너가 종료될 때 자동으로 제거합니다.
-      - `-it`: 대화형 모드로 실행하여 터미널을 컨테이너의 stdio에 연결합니다.
-      - `-e KOREA_TOURISM_API_KEY=...`: 런타임에 API 키 환경 변수를 설정합니다(빌드 인수 대안).
 
-    - **분리 모드 (백그라운드용):**
+    - **HTTP 전송 방식 (웹 애플리케이션용):**
+
       ```bash
-      docker run --name tourism-mcp -d -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" mcp-korea-tourism-api
+      # 런타임 환경 변수 사용
+      docker run --rm -p 8000:8000 \
+        -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" \
+        -e MCP_TRANSPORT=streamable-http \
+        -e MCP_HOST=0.0.0.0 \
+        -e MCP_PORT=8000 \
+        mcp-korea-tourism-api
+
+      # 상태 확인: curl http://localhost:8000/health
       ```
-      - `--name tourism-mcp`: 컨테이너에 이름을 할당합니다.
-      - `-d`: 컨테이너를 분리(백그라운드) 모드로 실행합니다.
-      - `docker logs tourism-mcp`를 사용하여 로그를 볼 수 있습니다.
+
+    - **SSE 전송 방식 (실시간 애플리케이션용):**
+
+      ```bash
+      docker run --rm -p 8080:8080 \
+        -e KOREA_TOURISM_API_KEY="YOUR_KTO_API_KEY" \
+        -e MCP_TRANSPORT=sse \
+        -e MCP_HOST=0.0.0.0 \
+        -e MCP_PORT=8080 \
+        mcp-korea-tourism-api
+      ```
+
+    - **Docker Compose 사용 (권장):**
+
+      ```bash
+      # 환경 변수 복사 및 구성
+      cp docker.env.example .env
+      # .env 파일을 편집하여 API 키와 선호하는 설정을 입력
+
+      # HTTP 전송 방식으로 실행 (기본 프로필)
+      docker-compose up mcp-tourism-http
+
+      # SSE 전송 방식으로 실행
+      docker-compose --profile sse up mcp-tourism-sse
+
+      # 디버그 로깅을 포함한 개발 설정으로 실행
+      docker-compose --profile dev up mcp-tourism-dev
+      ```
+
+## 🔧 전송 방식 구성
+
+한국 관광 API MCP 서버는 다양한 사용 사례에 맞는 여러 전송 프로토콜을 지원합니다:
+
+### 사용 가능한 전송 방식
+
+1. **`stdio`** (기본값): MCP 클라이언트와 직접 통합을 위한 표준 입력/출력 전송 방식
+   - 적합한 용도: Claude Desktop, Cursor 및 기타 MCP 호환 AI 어시스턴트
+   - 구성: 추가 설정 불필요
+
+2. **`streamable-http`**: 웹 애플리케이션을 위한 HTTP 기반 전송 방식
+   - 적합한 용도: 웹 애플리케이션, REST API 통합, 로드 밸런서
+   - 특징: HTTP 엔드포인트, 상태 확인, JSON 응답
+   - 기본 엔드포인트: `http://localhost:8000/mcp`
+
+3. **`sse`**: 실시간 애플리케이션을 위한 Server-Sent Events 전송 방식
+   - 적합한 용도: 실시간 웹 애플리케이션, 이벤트 기반 아키텍처
+   - 특징: 실시간 스트리밍, 지속적 연결
+   - 기본 엔드포인트: `http://localhost:8080/mcp`
+
+### 구성 옵션
+
+명령줄 인수 또는 환경 변수를 사용하여 서버를 구성할 수 있습니다:
+
+| 설정      | CLI 인수      | 환경 변수       | 기본값      | 설명                         |
+| --------- | ------------- | --------------- | ----------- | ---------------------------- |
+| 전송 방식 | `--transport` | `MCP_TRANSPORT` | `stdio`     | 사용할 전송 프로토콜         |
+| 호스트    | `--host`      | `MCP_HOST`      | `127.0.0.1` | HTTP 전송을 위한 호스트 주소 |
+| 포트      | `--port`      | `MCP_PORT`      | `8000`      | HTTP 전송을 위한 포트        |
+| 경로      | `--path`      | `MCP_PATH`      | `/mcp`      | HTTP 엔드포인트 경로         |
+| 로그 레벨 | `--log-level` | `MCP_LOG_LEVEL` | `INFO`      | 로깅 레벨                    |
+
+### 명령줄 예시
+
+```bash
+# 사용 가능한 모든 옵션에 대한 도움말 보기
+python -m mcp_tourism.server --help
+
+# 사용자 정의 포트에서 HTTP 전송 방식으로 실행
+python -m mcp_tourism.server --transport streamable-http --port 3000 --log-level DEBUG
+
+# SSE 전송 방식으로 실행
+python -m mcp_tourism.server --transport sse --host 0.0.0.0 --port 8080
+```
+
+### 환경 변수 예시
+
+```bash
+# 환경 변수 설정
+export MCP_TRANSPORT=streamable-http
+export MCP_HOST=0.0.0.0
+export MCP_PORT=8000
+export MCP_LOG_LEVEL=INFO
+export KOREA_TOURISM_API_KEY="your_api_key_here"
+
+# 서버 실행
+python -m mcp_tourism.server
+```
+
+### 상태 확인
+
+HTTP 및 SSE 전송 방식의 경우 `/health` 엔드포인트에서 상태 확인이 가능합니다:
+
+```bash
+# 서버 상태 확인
+curl http://localhost:8000/health
+
+# 예시 응답
+{
+  "status": "healthy",
+  "service": "Korea Tourism API MCP Server",
+  "transport": "streamable-http",
+  "timestamp": 1640995200.0
+}
+```
 
 ## 🛠️ Cursor와 통합하기
 
