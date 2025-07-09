@@ -1,10 +1,9 @@
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/harimkang-mcp-korea-tourism-api-badge.png)](https://mseep.ai/app/harimkang-mcp-korea-tourism-api)
-
 # Korea Tourism API MCP Server ✈️
 
 <!-- Badges -->
 
 [![smithery badge](https://smithery.ai/badge/@harimkang/mcp-korea-tourism-api)](https://smithery.ai/interface/@harimkang/mcp-korea-tourism-api)
+[![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/85b16552-af4c-4029-9d47-a4586438ec02)
 [![PyPI version](https://badge.fury.io/py/mcp-korea-tourism-api.svg)](https://badge.fury.io/py/mcp-korea-tourism-api)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI Tests](https://github.com/harimkang/mcp-korea-tourism-api/actions/workflows/ci.yml/badge.svg)](https://github.com/harimkang/mcp-korea-tourism-api/actions/workflows/ci.yml)
@@ -355,3 +354,5 @@ An AI assistant integrated with this MCP could handle queries like:
 - "Show me pictures of Bulguksa Temple."
 - "Are there any festivals in Busan next month?"
 - "Tell me more about Gyeongbokgung Palace, content ID 264337."
+
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/harimkang-mcp-korea-tourism-api-badge.png)](https://mseep.ai/app/harimkang-mcp-korea-tourism-api)
