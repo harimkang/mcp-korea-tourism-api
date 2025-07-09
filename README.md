@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/harimkang-mcp-korea-tourism-api-badge.png)](https://mseep.ai/app/harimkang-mcp-korea-tourism-api)
+
 # Korea Tourism API MCP Server ✈️
 
 <!-- Badges -->
