@@ -833,14 +833,14 @@ async def get_detailed_information(
             "createdtime": str,     # Creation timestamp
             "modifiedtime": str,    # Last modified timestamp
             "zipcode": str,         # Postal code
-            
+
             # Introduction details (varies by content type)
             "infocenter": str,      # Information center (for attractions)
             "restdate": str,        # Rest/closing days
             "usetime": str,         # Hours of operation
             "parking": str,         # Parking information
             # ... other type-specific fields
-            
+
             # Additional information
             "additional_info": [    # List of additional details
                 {
@@ -1082,11 +1082,11 @@ async def get_area_codes(
 async def health_check(request: Request) -> JSONResponse:
     """
     Health check endpoint for HTTP transports.
-    
+
     This endpoint provides a simple health check for the MCP server when running
     in HTTP mode. It verifies that the server is running and the API client is
     properly configured.
-    
+
     Returns:
         JSONResponse: Health status with server information
     """
