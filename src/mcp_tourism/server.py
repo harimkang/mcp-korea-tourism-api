@@ -159,16 +159,85 @@ async def search_tourism_by_keyword(
     """
     Search for tourism information in Korea by keyword.
 
+    This tool searches through the Korea Tourism Organization database for tourism items
+    matching the specified keyword. It supports filtering by content type, area, and
+    provides paginated results with detailed information.
+
     Args:
-        keyword: Search keyword (e.g., "Gyeongbokgung", "Hanok", "Bibimbap")
-        content_type: Type of content to search for (e.g., "Tourist Attraction", "Restaurant", "Festival Event")
-        area_code: Area code to filter results (e.g., "1" for Seoul)
-        language: Language for results (e.g., "en", "jp", "zh-cn"), default is "en"
-        page: Page number for pagination (default: 1)
-        rows: Number of items per page (default: 20)
+        keyword (str): Search keyword (e.g., "Gyeongbokgung", "Hanok", "Bibimbap")
+        content_type (str, optional): Type of content to search for. Valid values:
+            - "Tourist Attraction" (default)
+            - "Cultural Facility"
+            - "Festival Event"
+            - "Leisure Activity"
+            - "Accommodation"
+            - "Shopping"
+            - "Restaurant"
+            - "Transportation"
+        area_code (str, optional): Area code to filter results. Valid values:
+            - "1" (Seoul)
+            - "2" (Incheon)
+            - "3" (Daejeon)
+            - "4" (Daegu)
+            - "5" (Gwangju)
+            - "6" (Busan)
+            - "7" (Ulsan)
+            - "8" (Sejong)
+            - "31" (Gyeonggi-do)
+            - "32" (Gangwon-do)
+            - "33" (Chungcheongbuk-do)
+            - "34" (Chungcheongnam-do)
+            - "35" (Gyeongsangbuk-do)
+            - "36" (Gyeongsangnam-do)
+            - "37" (Jeonbuk-do)
+            - "38" (Jeollanam-do)
+            - "39" (Jeju-do)
+        language (str, optional): Language for results (default: "en"). Supported:
+            - "en" (English)
+            - "jp" (Japanese)
+            - "zh-cn" (Simplified Chinese)
+            - "zh-tw" (Traditional Chinese)
+            - "de" (German)
+            - "fr" (French)
+            - "es" (Spanish)
+            - "ru" (Russian)
+        page (int, optional): Page number for pagination (default: 1, min: 1)
+        rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        A dictionary containing search results with tourism information.
+        EmbeddedResource: JSON resource containing search results with structure:
+        {
+            "total_count": int,     # Total number of matching items
+            "num_of_rows": int,     # Number of items per page
+            "page_no": int,         # Current page number
+            "items": [              # List of tourism items
+                {
+                    "title": str,           # Name of the attraction/place
+                    "addr1": str,           # Primary address
+                    "addr2": str,           # Secondary address
+                    "areacode": str,        # Area code
+                    "sigungucode": str,     # Sigungu code
+                    "cat1": str,            # Category 1 code
+                    "cat2": str,            # Category 2 code
+                    "cat3": str,            # Category 3 code
+                    "contentid": str,       # Unique content ID
+                    "contenttypeid": str,   # Content type ID
+                    "createdtime": str,     # Creation timestamp
+                    "modifiedtime": str,    # Last modified timestamp
+                    "tel": str,             # Phone number
+                    "firstimage": str,      # URL of main image
+                    "firstimage2": str,     # URL of thumbnail image
+                    "mapx": str,            # Longitude
+                    "mapy": str,            # Latitude
+                    "mlevel": str,          # Map level
+                    "cpyrhtDivCd": str      # Copyright division code
+                }
+                # ... more items
+            ]
+        }
+
+    Example:
+        search_tourism_by_keyword("Gyeongbokgung", "Tourist Attraction", "1", "en", 1, 10)
     """
     # Get the API client lazily
     client = get_api_client()
@@ -225,16 +294,85 @@ async def get_tourism_by_area(
     """
     Browse tourism information by geographic areas in Korea.
 
+    This tool retrieves tourism items from a specific geographic area in Korea.
+    It allows filtering by area code, sigungu (district) code, and content type
+    to find relevant tourism information in a particular region.
+
     Args:
-        area_code: Area code (e.g., "1" for Seoul)
-        sigungu_code: Sigungu (district) code within the area
-        content_type: Type of content to filter (e.g., "Tourist Attraction", "Restaurant")
-        language: Language for results (e.g., "en", "jp", "zh-cn")
-        page: Page number for pagination (default: 1)
-        rows: Number of items per page (default: 20)
+        area_code (str): Area code. Valid values:
+            - "1" (Seoul)
+            - "2" (Incheon)
+            - "3" (Daejeon)
+            - "4" (Daegu)
+            - "5" (Gwangju)
+            - "6" (Busan)
+            - "7" (Ulsan)
+            - "8" (Sejong)
+            - "31" (Gyeonggi-do)
+            - "32" (Gangwon-do)
+            - "33" (Chungcheongbuk-do)
+            - "34" (Chungcheongnam-do)
+            - "35" (Gyeongsangbuk-do)
+            - "36" (Gyeongsangnam-do)
+            - "37" (Jeonbuk-do)
+            - "38" (Jeollanam-do)
+            - "39" (Jeju-do)
+        sigungu_code (str, optional): Sigungu (district) code within the area
+        content_type (str, optional): Type of content to filter. Valid values:
+            - "Tourist Attraction" (default)
+            - "Cultural Facility"
+            - "Festival Event"
+            - "Leisure Activity"
+            - "Accommodation"
+            - "Shopping"
+            - "Restaurant"
+            - "Transportation"
+        language (str, optional): Language for results (default: "en"). Supported:
+            - "en" (English)
+            - "jp" (Japanese)
+            - "zh-cn" (Simplified Chinese)
+            - "zh-tw" (Traditional Chinese)
+            - "de" (German)
+            - "fr" (French)
+            - "es" (Spanish)
+            - "ru" (Russian)
+        page (int, optional): Page number for pagination (default: 1, min: 1)
+        rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        A dictionary containing tourism information in the specified area.
+        EmbeddedResource: JSON resource containing area-based tourism information with structure:
+        {
+            "total_count": int,     # Total number of matching items
+            "num_of_rows": int,     # Number of items per page
+            "page_no": int,         # Current page number
+            "items": [              # List of tourism items
+                {
+                    "title": str,           # Name of the attraction/place
+                    "addr1": str,           # Primary address
+                    "addr2": str,           # Secondary address
+                    "areacode": str,        # Area code
+                    "sigungucode": str,     # Sigungu code
+                    "cat1": str,            # Category 1 code
+                    "cat2": str,            # Category 2 code
+                    "cat3": str,            # Category 3 code
+                    "contentid": str,       # Unique content ID
+                    "contenttypeid": str,   # Content type ID
+                    "createdtime": str,     # Creation timestamp
+                    "modifiedtime": str,    # Last modified timestamp
+                    "tel": str,             # Phone number
+                    "firstimage": str,      # URL of main image
+                    "firstimage2": str,     # URL of thumbnail image
+                    "mapx": str,            # Longitude
+                    "mapy": str,            # Latitude
+                    "zipcode": str,         # Postal code
+                    "mlevel": str           # Map level
+                }
+                # ... more items
+            ]
+        }
+
+    Example:
+        get_tourism_by_area("1", "1", "Tourist Attraction", "en", 1, 20)
     """
     # Validate and convert content_type
     content_type_id = None
@@ -297,17 +435,70 @@ async def find_nearby_attractions(
     """
     Find tourism attractions near a specific location in Korea.
 
+    This tool performs a location-based search to find tourism items within a specified
+    radius of given GPS coordinates. It's useful for finding nearby attractions,
+    restaurants, or other tourism facilities when you know a specific location.
+
     Args:
-        longitude: Longitude coordinate (e.g., 126.9780)
-        latitude: Latitude coordinate (e.g., 37.5665)
-        radius: Search radius in meters (default: 1000)
-        content_type: Type of content to filter (e.g., "Tourist Attraction", "Restaurant")
-        language: Language for results (e.g., "en", "jp", "zh-cn")
-        page: Page number for pagination (default: 1)
-        rows: Number of items per page (default: 20)
+        longitude (float): Longitude coordinate (e.g., 126.9780 for Seoul)
+        latitude (float): Latitude coordinate (e.g., 37.5665 for Seoul)
+        radius (int, optional): Search radius in meters (default: 1000, max: 20000)
+        content_type (str, optional): Type of content to filter. Valid values:
+            - "Tourist Attraction" (default)
+            - "Cultural Facility"
+            - "Festival Event"
+            - "Leisure Activity"
+            - "Accommodation"
+            - "Shopping"
+            - "Restaurant"
+            - "Transportation"
+        language (str, optional): Language for results (default: "en"). Supported:
+            - "en" (English)
+            - "jp" (Japanese)
+            - "zh-cn" (Simplified Chinese)
+            - "zh-tw" (Traditional Chinese)
+            - "de" (German)
+            - "fr" (French)
+            - "es" (Spanish)
+            - "ru" (Russian)
+        page (int, optional): Page number for pagination (default: 1, min: 1)
+        rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        A dictionary containing tourism attractions near the specified coordinates.
+        EmbeddedResource: JSON resource containing nearby tourism attractions with structure:
+        {
+            "total_count": int,     # Total number of matching items
+            "num_of_rows": int,     # Number of items per page
+            "page_no": int,         # Current page number
+            "search_radius": int,   # Search radius used
+            "items": [              # List of tourism items
+                {
+                    "title": str,           # Name of the attraction/place
+                    "addr1": str,           # Primary address
+                    "addr2": str,           # Secondary address
+                    "areacode": str,        # Area code
+                    "sigungucode": str,     # Sigungu code
+                    "cat1": str,            # Category 1 code
+                    "cat2": str,            # Category 2 code
+                    "cat3": str,            # Category 3 code
+                    "contentid": str,       # Unique content ID
+                    "contenttypeid": str,   # Content type ID
+                    "createdtime": str,     # Creation timestamp
+                    "modifiedtime": str,    # Last modified timestamp
+                    "tel": str,             # Phone number
+                    "firstimage": str,      # URL of main image
+                    "firstimage2": str,     # URL of thumbnail image
+                    "mapx": str,            # Longitude
+                    "mapy": str,            # Latitude
+                    "mlevel": str,          # Map level
+                    "dist": str             # Distance from the specified coordinates
+                }
+                # ... more items
+            ]
+        }
+
+    Example:
+        find_nearby_attractions(126.9780, 37.5665, 1000, "Tourist Attraction", "en", 1, 10)
     """
     # Validate and convert content_type
     content_type_id = None
@@ -368,16 +559,79 @@ async def search_festivals_by_date(
     """
     Find festivals in Korea by date range.
 
+    This tool searches for festivals and events occurring within a specified date range.
+    It's useful for finding cultural events, celebrations, and festivals happening
+    during a particular period or ongoing events.
+
     Args:
-        start_date: Start date in YYYYMMDD format (e.g., "20250501")
-        end_date: Optional end date in YYYYMMDD format (e.g., "20250531")
-        area_code: Area code to filter results (e.g., "1" for Seoul)
-        language: Language for results (e.g., "en", "jp", "zh-cn")
-        page: Page number for pagination (default: 1)
-        rows: Number of items per page (default: 20)
+        start_date (str): Start date in YYYYMMDD format (e.g., "20250501" for May 1, 2025)
+        end_date (str, optional): End date in YYYYMMDD format (e.g., "20250531" for May 31, 2025)
+            If not provided, searches for events starting from the start_date
+        area_code (str, optional): Area code to filter results. Valid values:
+            - "1" (Seoul)
+            - "2" (Incheon)
+            - "3" (Daejeon)
+            - "4" (Daegu)
+            - "5" (Gwangju)
+            - "6" (Busan)
+            - "7" (Ulsan)
+            - "8" (Sejong)
+            - "31" (Gyeonggi-do)
+            - "32" (Gangwon-do)
+            - "33" (Chungcheongbuk-do)
+            - "34" (Chungcheongnam-do)
+            - "35" (Gyeongsangbuk-do)
+            - "36" (Gyeongsangnam-do)
+            - "37" (Jeonbuk-do)
+            - "38" (Jeollanam-do)
+            - "39" (Jeju-do)
+        language (str, optional): Language for results (default: "en"). Supported:
+            - "en" (English)
+            - "jp" (Japanese)
+            - "zh-cn" (Simplified Chinese)
+            - "zh-tw" (Traditional Chinese)
+            - "de" (German)
+            - "fr" (French)
+            - "es" (Spanish)
+            - "ru" (Russian)
+        page (int, optional): Page number for pagination (default: 1, min: 1)
+        rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        A dictionary containing festivals occurring within the specified date range.
+        EmbeddedResource: JSON resource containing festivals within the specified date range with structure:
+        {
+            "total_count": int,     # Total number of matching items
+            "num_of_rows": int,     # Number of items per page
+            "page_no": int,         # Current page number
+            "start_date": str,      # Search start date
+            "end_date": str,        # Search end date or "ongoing"
+            "items": [              # List of festival items
+                {
+                    "title": str,           # Name of the festival
+                    "addr1": str,           # Primary address
+                    "addr2": str,           # Secondary address
+                    "areacode": str,        # Area code
+                    "contentid": str,       # Unique content ID
+                    "contenttypeid": str,   # Content type ID
+                    "createdtime": str,     # Creation timestamp
+                    "eventstartdate": str,  # Festival start date
+                    "eventenddate": str,    # Festival end date
+                    "firstimage": str,      # URL of main image
+                    "firstimage2": str,     # URL of thumbnail image
+                    "mapx": str,            # Longitude
+                    "mapy": str,            # Latitude
+                    "mlevel": str,          # Map level
+                    "tel": str,             # Phone number
+                    "cat1": str,            # Category 1 code
+                    "cat2": str,            # Category 2 code
+                    "cat3": str             # Category 3 code
+                }
+                # ... more items
+            ]
+        }
+
+    Example:
+        search_festivals_by_date("20250501", "20250531", "1", "en", 1, 20)
     """
     # Call the API client
     results = await get_api_client().search_festival(
@@ -420,15 +674,77 @@ async def find_accommodations(
     """
     Find accommodations in Korea by area.
 
+    This tool searches for accommodation options (hotels, guesthouses, pensions, etc.)
+    in a specific area in Korea. It provides detailed information about lodging
+    facilities including location, contact information, and special certifications.
+
     Args:
-        area_code: Area code (e.g., "1" for Seoul)
-        sigungu_code: Sigungu (district) code within the area
-        language: Language for results (e.g., "en", "jp", "zh-cn")
-        page: Page number for pagination (default: 1)
-        rows: Number of items per page (default: 20)
+        area_code (str, optional): Area code. Valid values:
+            - "1" (Seoul)
+            - "2" (Incheon)
+            - "3" (Daejeon)
+            - "4" (Daegu)
+            - "5" (Gwangju)
+            - "6" (Busan)
+            - "7" (Ulsan)
+            - "8" (Sejong)
+            - "31" (Gyeonggi-do)
+            - "32" (Gangwon-do)
+            - "33" (Chungcheongbuk-do)
+            - "34" (Chungcheongnam-do)
+            - "35" (Gyeongsangbuk-do)
+            - "36" (Gyeongsangnam-do)
+            - "37" (Jeonbuk-do)
+            - "38" (Jeollanam-do)
+            - "39" (Jeju-do)
+        sigungu_code (str, optional): Sigungu (district) code within the area
+        language (str, optional): Language for results (default: "en"). Supported:
+            - "en" (English)
+            - "jp" (Japanese)
+            - "zh-cn" (Simplified Chinese)
+            - "zh-tw" (Traditional Chinese)
+            - "de" (German)
+            - "fr" (French)
+            - "es" (Spanish)
+            - "ru" (Russian)
+        page (int, optional): Page number for pagination (default: 1, min: 1)
+        rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        A dictionary containing accommodation options in the specified area.
+        EmbeddedResource: JSON resource containing accommodation options with structure:
+        {
+            "total_count": int,     # Total number of matching items
+            "num_of_rows": int,     # Number of items per page
+            "page_no": int,         # Current page number
+            "items": [              # List of accommodation items
+                {
+                    "title": str,           # Name of the accommodation
+                    "addr1": str,           # Primary address
+                    "addr2": str,           # Secondary address
+                    "areacode": str,        # Area code
+                    "sigungucode": str,     # Sigungu code
+                    "contentid": str,       # Unique content ID
+                    "contenttypeid": str,   # Content type ID
+                    "createdtime": str,     # Creation timestamp
+                    "firstimage": str,      # URL of main image
+                    "firstimage2": str,     # URL of thumbnail image
+                    "mapx": str,            # Longitude
+                    "mapy": str,            # Latitude
+                    "mlevel": str,          # Map level
+                    "tel": str,             # Phone number
+                    "cat1": str,            # Category 1 code
+                    "cat2": str,            # Category 2 code
+                    "cat3": str,            # Category 3 code
+                    "hanok": str,           # Korean traditional house flag
+                    "benikia": str,         # Benikia hotel flag
+                    "goodstay": str         # Goodstay accommodation flag
+                }
+                # ... more items
+            ]
+        }
+
+    Example:
+        find_accommodations("1", "1", "en", 1, 20)
     """
     # Call the API client
     results = await get_api_client().search_stay(
@@ -466,13 +782,79 @@ async def get_detailed_information(
     """
     Get detailed information about a specific tourism item in Korea.
 
+    This tool retrieves comprehensive details about a specific tourism item by its
+    content ID. It combines common information, introduction details, and additional
+    information to provide a complete picture of the tourism item.
+
     Args:
-        content_id: Content ID of the tourism item
-        content_type: Type of content (e.g., "Tourist Attraction", "Restaurant")
-        language: Language for results (e.g., "en", "jp", "zh-cn")
+        content_id (str): Content ID of the tourism item (obtained from other search functions)
+        content_type (str, optional): Type of content. Valid values:
+            - "Tourist Attraction"
+            - "Cultural Facility"
+            - "Festival Event"
+            - "Leisure Activity"
+            - "Accommodation"
+            - "Shopping"
+            - "Restaurant"
+            - "Transportation"
+        language (str, optional): Language for results (default: "en"). Supported:
+            - "en" (English)
+            - "jp" (Japanese)
+            - "zh-cn" (Simplified Chinese)
+            - "zh-tw" (Traditional Chinese)
+            - "de" (German)
+            - "fr" (French)
+            - "es" (Spanish)
+            - "ru" (Russian)
 
     Returns:
-        A dictionary containing detailed information about the specified tourism item.
+        EmbeddedResource: JSON resource containing detailed information with structure:
+        {
+            # Common information
+            "title": str,           # Name of the item
+            "contentid": str,       # Unique content ID
+            "contenttypeid": str,   # Content type ID
+            "addr1": str,           # Primary address
+            "addr2": str,           # Secondary address
+            "areacode": str,        # Area code
+            "sigungucode": str,     # Sigungu code
+            "cat1": str,            # Category 1 code
+            "cat2": str,            # Category 2 code
+            "cat3": str,            # Category 3 code
+            "mapx": str,            # Longitude
+            "mapy": str,            # Latitude
+            "mlevel": str,          # Map level
+            "overview": str,        # Detailed description
+            "tel": str,             # Phone number
+            "telname": str,         # Contact name
+            "homepage": str,        # Website URL
+            "firstimage": str,      # URL of main image
+            "firstimage2": str,     # URL of thumbnail image
+            "createdtime": str,     # Creation timestamp
+            "modifiedtime": str,    # Last modified timestamp
+            "zipcode": str,         # Postal code
+            
+            # Introduction details (varies by content type)
+            "infocenter": str,      # Information center (for attractions)
+            "restdate": str,        # Rest/closing days
+            "usetime": str,         # Hours of operation
+            "parking": str,         # Parking information
+            # ... other type-specific fields
+            
+            # Additional information
+            "additional_info": [    # List of additional details
+                {
+                    "infoname": str,    # Name of the information
+                    "infotext": str,    # Detailed text information
+                    "fldgubun": str,    # Field division code
+                    "serialnum": str    # Serial number
+                }
+                # ... more items
+            ]
+        }
+
+    Example:
+        get_detailed_information("126508", "Tourist Attraction", "en")
     """
     # Validate and convert content_type
     content_type_id = None
@@ -544,14 +926,44 @@ async def get_tourism_images(
     """
     Get images for a specific tourism item in Korea.
 
+    This tool retrieves all available images for a specific tourism item by its
+    content ID. It provides both original and thumbnail image URLs along with
+    image metadata.
+
     Args:
-        content_id: Content ID of the tourism item
-        language: Language for results (e.g., "en", "jp", "zh-cn")
-        page: Page number for pagination (default: 1)
-        rows: Number of items per page (default: 20)
+        content_id (str): Content ID of the tourism item (obtained from other search functions)
+        language (str, optional): Language for results (default: "en"). Supported:
+            - "en" (English)
+            - "jp" (Japanese)
+            - "zh-cn" (Simplified Chinese)
+            - "zh-tw" (Traditional Chinese)
+            - "de" (German)
+            - "fr" (French)
+            - "es" (Spanish)
+            - "ru" (Russian)
+        page (int, optional): Page number for pagination (default: 1, min: 1)
+        rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        A dictionary containing images for the specified tourism item.
+        EmbeddedResource: JSON resource containing images with structure:
+        {
+            "total_count": int,     # Total number of matching items
+            "content_id": str,      # Content ID this image belongs to
+            "items": [              # List of image items
+                {
+                    "contentid": str,       # Content ID this image belongs to
+                    "imgname": str,         # Image name
+                    "originimgurl": str,    # URL of original image
+                    "smallimageurl": str,   # URL of small/thumbnail image
+                    "serialnum": str,       # Serial number
+                    "cpyrhtDivCd": str      # Copyright division code
+                }
+                # ... more items
+            ]
+        }
+
+    Example:
+        get_tourism_images("126508", "en", 1, 10)
     """
     # Call the API client
     results = await get_api_client().get_detail_images(
@@ -585,14 +997,63 @@ async def get_area_codes(
     """
     Get area codes for regions in Korea.
 
+    This tool retrieves area codes and their corresponding names for Korean regions.
+    It can be used to get top-level area codes (provinces/cities) or sub-area codes
+    (districts/counties) within a specific area.
+
     Args:
-        parent_area_code: Parent area code to get sub-areas (None for top-level areas)
-        language: Language for results (e.g., "en", "jp", "zh-cn")
-        page: Page number for pagination (default: 1)
-        rows: Number of items per page (default: 100)
+        parent_area_code (str, optional): Parent area code to get sub-areas
+            - If None: Returns top-level area codes (provinces/cities)
+            - If provided: Returns sigungu codes for that area
+        language (str, optional): Language for results (default: "en"). Supported:
+            - "en" (English)
+            - "jp" (Japanese)
+            - "zh-cn" (Simplified Chinese)
+            - "zh-tw" (Traditional Chinese)
+            - "de" (German)
+            - "fr" (French)
+            - "es" (Spanish)
+            - "ru" (Russian)
+        page (int, optional): Page number for pagination (default: 1, min: 1)
+        rows (int, optional): Number of items per page (default: 100, max: 100)
 
     Returns:
-        A dictionary containing area codes and names.
+        EmbeddedResource: JSON resource containing area codes with structure:
+        {
+            "total_count": int,     # Total number of matching items
+            "parent_area_code": str, # Parent area code used (or null)
+            "items": [              # List of area code items
+                {
+                    "code": str,            # Area code value
+                    "name": str,            # Area name
+                    "rnum": str             # Row number
+                }
+                # ... more items
+            ]
+        }
+
+    Available area codes:
+        - "1" (Seoul)
+        - "2" (Incheon)
+        - "3" (Daejeon)
+        - "4" (Daegu)
+        - "5" (Gwangju)
+        - "6" (Busan)
+        - "7" (Ulsan)
+        - "8" (Sejong)
+        - "31" (Gyeonggi-do)
+        - "32" (Gangwon-do)
+        - "33" (Chungcheongbuk-do)
+        - "34" (Chungcheongnam-do)
+        - "35" (Gyeongsangbuk-do)
+        - "36" (Gyeongsangnam-do)
+        - "37" (Jeonbuk-do)
+        - "38" (Jeollanam-do)
+        - "39" (Jeju-do)
+
+    Example:
+        get_area_codes(None, "en", 1, 50)  # Get top-level areas
+        get_area_codes("1", "en", 1, 50)   # Get districts in Seoul
     """
     # Call the API client
     results = await get_api_client().get_area_code_list(
@@ -619,7 +1080,16 @@ async def get_area_codes(
 # Add health check endpoint for HTTP transports
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request: Request) -> JSONResponse:
-    """Health check endpoint for HTTP transports."""
+    """
+    Health check endpoint for HTTP transports.
+    
+    This endpoint provides a simple health check for the MCP server when running
+    in HTTP mode. It verifies that the server is running and the API client is
+    properly configured.
+    
+    Returns:
+        JSONResponse: Health status with server information
+    """
     try:
         # Try to get the API client to verify it's properly configured
         _ = get_api_client()
