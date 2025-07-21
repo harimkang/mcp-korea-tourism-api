@@ -494,8 +494,7 @@ async def find_nearby_attractions(
         rows=rows,
     )
     # Add search radius to the results
-    results["search_radius"] = radius
-    return results
+    return {**results, "search_radius": radius}
 
 
 @mcp.tool
