@@ -203,7 +203,7 @@ async def search_tourism_by_keyword(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        dict: JSON resource containing search results with structure:
+        dict: Search results with structure:
         {
             "total_count": int,     # Total number of matching items
             "num_of_rows": int,     # Number of items per page
@@ -326,7 +326,7 @@ async def get_tourism_by_area(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing area-based tourism information with structure:
+        dict: Area-based tourism information with structure:
         {
             "total_count": int,     # Total number of matching items
             "num_of_rows": int,     # Number of items per page
@@ -431,7 +431,7 @@ async def find_nearby_attractions(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing nearby tourism attractions with structure:
+        dict: Nearby tourism attractions with structure:
         {
             "total_count": int,     # Total number of matching items
             "num_of_rows": int,     # Number of items per page
@@ -548,7 +548,7 @@ async def search_festivals_by_date(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing festivals within the specified date range with structure:
+        dict: Festivals within the specified date range with structure:
         {
             "total_count": int,     # Total number of matching items
             "num_of_rows": int,     # Number of items per page
@@ -648,7 +648,7 @@ async def find_accommodations(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing accommodation options with structure:
+        dict: Accommodation options with structure:
         {
             "total_count": int,     # Total number of matching items
             "num_of_rows": int,     # Number of items per page
@@ -728,7 +728,7 @@ async def get_detailed_information(
             - "ru" (Russian)
 
     Returns:
-        EmbeddedResource: JSON resource containing detailed information with structure:
+        dict: Detailed information with structure:
         {
             # Common information
             "title": str,           # Name of the item
@@ -855,7 +855,7 @@ async def get_tourism_images(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing images with structure:
+        dict: Images with structure:
         {
             "total_count": int,     # Total number of matching items
             "content_id": str,      # Content ID this image belongs to
@@ -914,7 +914,7 @@ async def get_area_codes(
         rows (int, optional): Number of items per page (default: 100, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing area codes with structure:
+        dict: Area codes with structure:
         {
             "total_count": int,     # Total number of matching items
             "parent_area_code": str, # Parent area code used (or null)
