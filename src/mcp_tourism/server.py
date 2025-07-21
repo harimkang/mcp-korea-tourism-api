@@ -956,8 +956,7 @@ async def get_area_codes(
         area_code=parent_area_code, language=language, page=page, rows=rows
     )
     # Add parent_area_code to the results
-    results["parent_area_code"] = parent_area_code
-    return results
+    return {**results, "parent_area_code": parent_area_code}
 
 
 # Add health check endpoint for HTTP transports
