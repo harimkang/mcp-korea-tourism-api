@@ -880,8 +880,7 @@ async def get_tourism_images(
         content_id=content_id, language=language, page=page, rows=rows
     )
     # Add content_id to the results
-    results["content_id"] = content_id
-    return results
+    return {**results, "content_id": content_id}
 
 
 @mcp.tool
