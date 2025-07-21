@@ -593,9 +593,11 @@ async def search_festivals_by_date(
         rows=rows,
     )
     # Add date information to the results
-    results["start_date"] = start_date
-    results["end_date"] = end_date or "ongoing"
-    return results
+    return {
+        **results,
+        "start_date": start_date,
+        "end_date": end_date or "ongoing",
+    }
 
 
 @mcp.tool
