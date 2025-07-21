@@ -3,12 +3,10 @@ import os
 import atexit
 import signal
 import asyncio
-import json
 import argparse
 import sys
 from typing import Dict, Any, Optional
 from fastmcp import FastMCP
-from mcp.types import EmbeddedResource, TextResourceContents
 from mcp_tourism.api_client import KoreaTourismApiClient, CONTENTTYPE_ID_MAP
 import logging
 from starlette.requests import Request
@@ -155,7 +153,7 @@ async def search_tourism_by_keyword(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> EmbeddedResource:
+) -> dict:
     """
     Search for tourism information in Korea by keyword.
 
@@ -205,7 +203,7 @@ async def search_tourism_by_keyword(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing search results with structure:
+        dict: Search results with structure:
         {
             "total_count": int,     # Total number of matching items
             "num_of_rows": int,     # Number of items per page
@@ -259,26 +257,14 @@ async def search_tourism_by_keyword(
                 f"Invalid content_type: '{content_type}'. Valid types are: {valid_types}"
             )
 
-    # Call the API client
-    result = await client.search_by_keyword(
+    # Call the API client and return dict directly
+    return await client.search_by_keyword(
         keyword=keyword,
         content_type_id=content_type_id,
         area_code=area_code,
         language=language,
         page=page,
         rows=rows,
-    )
-
-    # Return as EmbeddedResource to solve response format issue
-    return EmbeddedResource(
-        type="resource",
-        resource=TextResourceContents(
-            uri=f"korea-tourism://search/{keyword}",
-            mimeType="application/json",
-            text=json.dumps(
-                result, ensure_ascii=False, indent=2, separators=(",", ": ")
-            ),
-        ),
     )
 
 
@@ -290,7 +276,7 @@ async def get_tourism_by_area(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> EmbeddedResource:
+) -> dict:
     """
     Browse tourism information by geographic areas in Korea.
 
@@ -340,7 +326,7 @@ async def get_tourism_by_area(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing area-based tourism information with structure:
+        dict: Area-based tourism information with structure:
         {
             "total_count": int,     # Total number of matching items
             "num_of_rows": int,     # Number of items per page
@@ -391,34 +377,14 @@ async def get_tourism_by_area(
                 f"Invalid content_type: '{content_type}'. Valid types are: {valid_types}"
             )
 
-    # Call the API client
-    results = await get_api_client().get_area_based_list(
+    # Call the API client and return dict directly
+    return await get_api_client().get_area_based_list(
         area_code=area_code,
         sigunguCode=sigungu_code,
         content_type_id=content_type_id,
         language=language,
         page=page,
         rows=rows,
-    )
-
-    # Prepare result data
-    result_data = {
-        "total_count": results.get("total_count", 0),
-        "items": results.get("items", []),
-        "page_no": results.get("page_no", 1),
-        "num_of_rows": results.get("num_of_rows", 0),
-    }
-
-    # Return as EmbeddedResource to solve response format issue
-    return EmbeddedResource(
-        type="resource",
-        resource=TextResourceContents(
-            uri=f"korea-tourism://area/{area_code}",
-            mimeType="application/json",
-            text=json.dumps(
-                result_data, ensure_ascii=False, indent=2, separators=(",", ": ")
-            ),
-        ),
     )
 
 
@@ -431,7 +397,7 @@ async def find_nearby_attractions(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> EmbeddedResource:
+) -> dict:
     """
     Find tourism attractions near a specific location in Korea.
 
@@ -465,7 +431,7 @@ async def find_nearby_attractions(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing nearby tourism attractions with structure:
+        dict: Nearby tourism attractions with structure:
         {
             "total_count": int,     # Total number of matching items
             "num_of_rows": int,     # Number of items per page
@@ -517,7 +483,7 @@ async def find_nearby_attractions(
                 f"Invalid content_type: '{content_type}'. Valid types are: {valid_types}"
             )
 
-    # Call the API client
+    # Call the API client and return dict directly
     results = await get_api_client().get_location_based_list(
         mapx=longitude,
         mapy=latitude,
@@ -527,24 +493,8 @@ async def find_nearby_attractions(
         page=page,
         rows=rows,
     )
-
-    result_data = {
-        "total_count": results.get("total_count", 0),
-        "items": results.get("items", []),
-        "page_no": results.get("page_no", 1),
-        "num_of_rows": results.get("num_of_rows", 0),
-        "search_radius": radius,
-    }
-    return EmbeddedResource(
-        type="resource",
-        resource=TextResourceContents(
-            uri=f"korea-tourism://nearby/{longitude}/{latitude}",
-            mimeType="application/json",
-            text=json.dumps(
-                result_data, ensure_ascii=False, indent=2, separators=(",", ": ")
-            ),
-        ),
-    )
+    # Add search radius to the results
+    return {**results, "search_radius": radius}
 
 
 @mcp.tool
@@ -555,7 +505,7 @@ async def search_festivals_by_date(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> EmbeddedResource:
+) -> dict:
     """
     Find festivals in Korea by date range.
 
@@ -598,7 +548,7 @@ async def search_festivals_by_date(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing festivals within the specified date range with structure:
+        dict: Festivals within the specified date range with structure:
         {
             "total_count": int,     # Total number of matching items
             "num_of_rows": int,     # Number of items per page
@@ -633,7 +583,7 @@ async def search_festivals_by_date(
     Example:
         search_festivals_by_date("20250501", "20250531", "1", "en", 1, 20)
     """
-    # Call the API client
+    # Call the API client and return dict directly
     results = await get_api_client().search_festival(
         event_start_date=start_date,
         event_end_date=end_date,
@@ -642,25 +592,12 @@ async def search_festivals_by_date(
         page=page,
         rows=rows,
     )
-
-    result_data = {
-        "total_count": results.get("total_count", 0),
-        "items": results.get("items", []),
-        "page_no": results.get("page_no", 1),
-        "num_of_rows": results.get("num_of_rows", 0),
+    # Add date information to the results
+    return {
+        **results,
         "start_date": start_date,
         "end_date": end_date or "ongoing",
     }
-    return EmbeddedResource(
-        type="resource",
-        resource=TextResourceContents(
-            uri=f"korea-tourism://festival/{start_date}",
-            mimeType="application/json",
-            text=json.dumps(
-                result_data, ensure_ascii=False, indent=2, separators=(",", ": ")
-            ),
-        ),
-    )
 
 
 @mcp.tool
@@ -670,7 +607,7 @@ async def find_accommodations(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> EmbeddedResource:
+) -> dict:
     """
     Find accommodations in Korea by area.
 
@@ -711,7 +648,7 @@ async def find_accommodations(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing accommodation options with structure:
+        dict: Accommodation options with structure:
         {
             "total_count": int,     # Total number of matching items
             "num_of_rows": int,     # Number of items per page
@@ -746,30 +683,13 @@ async def find_accommodations(
     Example:
         find_accommodations("1", "1", "en", 1, 20)
     """
-    # Call the API client
-    results = await get_api_client().search_stay(
+    # Call the API client and return dict directly
+    return await get_api_client().search_stay(
         area_code=area_code,
         sigungu_code=sigungu_code,
         language=language,
         page=page,
         rows=rows,
-    )
-
-    result_data = {
-        "total_count": results.get("total_count", 0),
-        "items": results.get("items", []),
-        "page_no": results.get("page_no", 1),
-        "num_of_rows": results.get("num_of_rows", 0),
-    }
-    return EmbeddedResource(
-        type="resource",
-        resource=TextResourceContents(
-            uri=f"korea-tourism://accommodation/{area_code}",
-            mimeType="application/json",
-            text=json.dumps(
-                result_data, ensure_ascii=False, indent=2, separators=(",", ": ")
-            ),
-        ),
     )
 
 
@@ -778,7 +698,7 @@ async def get_detailed_information(
     content_id: str,
     content_type: str | None = None,
     language: str | None = None,
-) -> EmbeddedResource:
+) -> dict:
     """
     Get detailed information about a specific tourism item in Korea.
 
@@ -808,7 +728,7 @@ async def get_detailed_information(
             - "ru" (Russian)
 
     Returns:
-        EmbeddedResource: JSON resource containing detailed information with structure:
+        dict: Detailed information with structure:
         {
             # Common information
             "title": str,           # Name of the item
@@ -903,17 +823,7 @@ async def get_detailed_information(
 
     # Combine all details
     item = common_details.get("items", [{}])[0] if common_details.get("items") else {}
-    result_data = {**item, **intro_details, **additional_details}
-    return EmbeddedResource(
-        type="resource",
-        resource=TextResourceContents(
-            uri=f"korea-tourism://detail/{content_id}",
-            mimeType="application/json",
-            text=json.dumps(
-                result_data, ensure_ascii=False, indent=2, separators=(",", ": ")
-            ),
-        ),
-    )
+    return {**item, **intro_details, **additional_details}
 
 
 @mcp.tool
@@ -922,7 +832,7 @@ async def get_tourism_images(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
-) -> EmbeddedResource:
+) -> dict:
     """
     Get images for a specific tourism item in Korea.
 
@@ -945,7 +855,7 @@ async def get_tourism_images(
         rows (int, optional): Number of items per page (default: 20, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing images with structure:
+        dict: Images with structure:
         {
             "total_count": int,     # Total number of matching items
             "content_id": str,      # Content ID this image belongs to
@@ -965,26 +875,12 @@ async def get_tourism_images(
     Example:
         get_tourism_images("126508", "en", 1, 10)
     """
-    # Call the API client
+    # Call the API client and return dict directly
     results = await get_api_client().get_detail_images(
         content_id=content_id, language=language, page=page, rows=rows
     )
-
-    result_data = {
-        "total_count": results.get("total_count", 0),
-        "items": results.get("items", []),
-        "content_id": content_id,
-    }
-    return EmbeddedResource(
-        type="resource",
-        resource=TextResourceContents(
-            uri=f"korea-tourism://images/{content_id}",
-            mimeType="application/json",
-            text=json.dumps(
-                result_data, ensure_ascii=False, indent=2, separators=(",", ": ")
-            ),
-        ),
-    )
+    # Add content_id to the results
+    return {**results, "content_id": content_id}
 
 
 @mcp.tool
@@ -993,7 +889,7 @@ async def get_area_codes(
     language: str | None = None,
     page: int = 1,
     rows: int = 100,
-) -> EmbeddedResource:
+) -> dict:
     """
     Get area codes for regions in Korea.
 
@@ -1018,7 +914,7 @@ async def get_area_codes(
         rows (int, optional): Number of items per page (default: 100, max: 100)
 
     Returns:
-        EmbeddedResource: JSON resource containing area codes with structure:
+        dict: Area codes with structure:
         {
             "total_count": int,     # Total number of matching items
             "parent_area_code": str, # Parent area code used (or null)
@@ -1055,26 +951,12 @@ async def get_area_codes(
         get_area_codes(None, "en", 1, 50)  # Get top-level areas
         get_area_codes("1", "en", 1, 50)   # Get districts in Seoul
     """
-    # Call the API client
+    # Call the API client and return dict directly
     results = await get_api_client().get_area_code_list(
         area_code=parent_area_code, language=language, page=page, rows=rows
     )
-
-    result_data = {
-        "total_count": results.get("total_count", 0),
-        "items": results.get("items", []),
-        "parent_area_code": parent_area_code,
-    }
-    return EmbeddedResource(
-        type="resource",
-        resource=TextResourceContents(
-            uri="korea-tourism://area-codes",
-            mimeType="application/json",
-            text=json.dumps(
-                result_data, ensure_ascii=False, indent=2, separators=(",", ": ")
-            ),
-        ),
-    )
+    # Add parent_area_code to the results
+    return {**results, "parent_area_code": parent_area_code}
 
 
 # Add health check endpoint for HTTP transports
