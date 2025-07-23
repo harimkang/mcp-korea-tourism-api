@@ -1,4 +1,5 @@
 # server.py
+from typing import List
 import os
 import atexit
 import signal
@@ -153,6 +154,7 @@ async def search_tourism_by_keyword(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
+    filter: List[str] | None = None,
 ) -> dict:
     """
     Search for tourism information in Korea by keyword.
@@ -201,6 +203,9 @@ async def search_tourism_by_keyword(
             - "ru" (Russian)
         page (int, optional): Page number for pagination (default: 1, min: 1)
         rows (int, optional): Number of items per page (default: 20, max: 100)
+        filter (list[str], optional): List of keys to include in each result item (whitelist).
+            - If filter is None or an empty list ([]), all fields are returned.
+            - If filter contains values, only the specified keys will be included in each item, and all other keys will be removed.
 
     Returns:
         dict: Search results with structure:
@@ -258,7 +263,7 @@ async def search_tourism_by_keyword(
             )
 
     # Call the API client and return dict directly
-    return await client.search_by_keyword(
+    result = await client.search_by_keyword(
         keyword=keyword,
         content_type_id=content_type_id,
         area_code=area_code,
@@ -266,6 +271,14 @@ async def search_tourism_by_keyword(
         page=page,
         rows=rows,
     )
+    if filter:
+        # Apply additional filtering if provided
+        filter_items = []
+        for item in result.get("items", []):
+            item = {k: v for k, v in item.items() if k in filter}
+            filter_items.append(item)
+        result["items"] = filter_items
+    return result
 
 
 @mcp.tool
@@ -276,6 +289,7 @@ async def get_tourism_by_area(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
+    filter: list[str] | None = None,
 ) -> dict:
     """
     Browse tourism information by geographic areas in Korea.
@@ -324,6 +338,9 @@ async def get_tourism_by_area(
             - "ru" (Russian)
         page (int, optional): Page number for pagination (default: 1, min: 1)
         rows (int, optional): Number of items per page (default: 20, max: 100)
+        filter (list[str], optional): List of keys to include in each result item (whitelist).
+            - If filter is None or an empty list ([]), all fields are returned.
+            - If filter contains values, only the specified keys will be included in each item, and all other keys will be removed.
 
     Returns:
         dict: Area-based tourism information with structure:
@@ -378,7 +395,7 @@ async def get_tourism_by_area(
             )
 
     # Call the API client and return dict directly
-    return await get_api_client().get_area_based_list(
+    result = await get_api_client().get_area_based_list(
         area_code=area_code,
         sigunguCode=sigungu_code,
         content_type_id=content_type_id,
@@ -386,6 +403,14 @@ async def get_tourism_by_area(
         page=page,
         rows=rows,
     )
+    if filter:
+        # Apply additional filtering if provided
+        filter_items = []
+        for item in result.get("items", []):
+            item = {k: v for k, v in item.items() if k in filter}
+            filter_items.append(item)
+        result["items"] = filter_items
+    return result
 
 
 @mcp.tool
@@ -397,6 +422,7 @@ async def find_nearby_attractions(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
+    filter: list[str] | None = None,
 ) -> dict:
     """
     Find tourism attractions near a specific location in Korea.
@@ -429,6 +455,9 @@ async def find_nearby_attractions(
             - "ru" (Russian)
         page (int, optional): Page number for pagination (default: 1, min: 1)
         rows (int, optional): Number of items per page (default: 20, max: 100)
+        filter (list[str], optional): List of keys to include in each result item (whitelist).
+            - If filter is None or an empty list ([]), all fields are returned.
+            - If filter contains values, only the specified keys will be included in each item, and all other keys will be removed.
 
     Returns:
         dict: Nearby tourism attractions with structure:
@@ -493,6 +522,13 @@ async def find_nearby_attractions(
         page=page,
         rows=rows,
     )
+    # Apply filter if provided
+    if filter:
+        filter_items = []
+        for item in results.get("items", []):
+            item = {k: v for k, v in item.items() if k in filter}
+            filter_items.append(item)
+        results["items"] = filter_items
     # Add search radius to the results
     return {**results, "search_radius": radius}
 
@@ -505,6 +541,7 @@ async def search_festivals_by_date(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
+    filter: list[str] | None = None,
 ) -> dict:
     """
     Find festivals in Korea by date range.
@@ -546,6 +583,9 @@ async def search_festivals_by_date(
             - "ru" (Russian)
         page (int, optional): Page number for pagination (default: 1, min: 1)
         rows (int, optional): Number of items per page (default: 20, max: 100)
+        filter (list[str], optional): List of keys to include in each result item (whitelist).
+            - If filter is None or an empty list ([]), all fields are returned.
+            - If filter contains values, only the specified keys will be included in each item, and all other keys will be removed.
 
     Returns:
         dict: Festivals within the specified date range with structure:
@@ -592,6 +632,13 @@ async def search_festivals_by_date(
         page=page,
         rows=rows,
     )
+    # Apply filter if provided
+    if filter:
+        filter_items = []
+        for item in results.get("items", []):
+            item = {k: v for k, v in item.items() if k in filter}
+            filter_items.append(item)
+        results["items"] = filter_items
     # Add date information to the results
     return {
         **results,
@@ -607,6 +654,7 @@ async def find_accommodations(
     language: str | None = None,
     page: int = 1,
     rows: int = 20,
+    filter: list[str] | None = None,
 ) -> dict:
     """
     Find accommodations in Korea by area.
@@ -646,6 +694,9 @@ async def find_accommodations(
             - "ru" (Russian)
         page (int, optional): Page number for pagination (default: 1, min: 1)
         rows (int, optional): Number of items per page (default: 20, max: 100)
+        filter (list[str], optional): List of keys to include in each result item (whitelist).
+            - If filter is None or an empty list ([]), all fields are returned.
+            - If filter contains values, only the specified keys will be included in each item, and all other keys will be removed.
 
     Returns:
         dict: Accommodation options with structure:
@@ -684,13 +735,20 @@ async def find_accommodations(
         find_accommodations("1", "1", "en", 1, 20)
     """
     # Call the API client and return dict directly
-    return await get_api_client().search_stay(
+    result = await get_api_client().search_stay(
         area_code=area_code,
         sigungu_code=sigungu_code,
         language=language,
         page=page,
         rows=rows,
     )
+    if filter:
+        filter_items = []
+        for item in result.get("items", []):
+            item = {k: v for k, v in item.items() if k in filter}
+            filter_items.append(item)
+        result["items"] = filter_items
+    return result
 
 
 @mcp.tool
