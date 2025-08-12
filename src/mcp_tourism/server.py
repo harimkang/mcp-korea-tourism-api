@@ -854,7 +854,6 @@ async def get_detailed_information(
     # Get common details
     common_details = await get_api_client().get_detail_common(
         content_id=content_id,
-        content_type_id=content_type_id,
         language=language,
     )
 

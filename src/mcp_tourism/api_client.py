@@ -872,7 +872,6 @@ class KoreaTourismApiClient:
     async def get_detail_common(
         self,
         content_id: str,
-        content_type_id: Optional[str] = None,
         language: Optional[str] = None,
         rows: int = 20,
         page: int = 1,
@@ -885,7 +884,6 @@ class KoreaTourismApiClient:
 
         Args:
             content_id: Content ID from the tourism API
-            content_type_id: Content type ID from the tourism API
             language: Override the client's default language
             rows: Number of items per page
             page: Page number for pagination
@@ -932,9 +930,6 @@ class KoreaTourismApiClient:
             "pageNo": str(page),
             "numOfRows": str(rows),
         }
-
-        if content_type_id:
-            params["contentTypeId"] = content_type_id
 
         # Pass language override directly to _make_request
         return await self._make_request(
