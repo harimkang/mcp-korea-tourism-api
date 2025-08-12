@@ -143,7 +143,7 @@ class KoreaTourismApiClient:
     DETAIL_INTRO_ENDPOINT = "/detailIntro2"
     DETAIL_INFO_ENDPOINT = "/detailInfo2"
     DETAIL_IMAGE_ENDPOINT = "/detailImage2"
-    AREA_BASED_SYNC_LIST_ENDPOINT = "/areaBasedSyncList2" 
+    AREA_BASED_SYNC_LIST_ENDPOINT = "/areaBasedSyncList2"
     AREA_CODE_LIST_ENDPOINT = "/areaCode2"
     CATEGORY_CODE_LIST_ENDPOINT = "/categoryCode2"
 
