@@ -29,14 +29,14 @@ CONTENTTYPE_ID_MAP = {
 
 # Map of supported languages to their service endpoints
 LANGUAGE_SERVICE_MAP = {
-    "en": "EngService1",  # English
-    "jp": "JpnService1",  # Japanese
-    "zh-cn": "ChsService1",  # Simplified Chinese
-    "zh-tw": "ChtService1",  # Traditional Chinese
-    "de": "GerService1",  # German
-    "fr": "FreService1",  # French
-    "es": "SpnService1",  # Spanish
-    "ru": "RusService1",  # Russian
+    "en": "EngService2",  # English
+    "jp": "JpnService2",  # Japanese
+    "zh-cn": "ChsService2",  # Simplified Chinese
+    "zh-tw": "ChtService2",  # Traditional Chinese
+    "de": "GerService2",  # German
+    "fr": "FreService2",  # French
+    "es": "SpnService2",  # Spanish
+    "ru": "RusService2",  # Russian
 }
 
 
@@ -131,7 +131,6 @@ class KoreaTourismApiClient:
     MOBILE_APP = "MobileApp"
     RESPONSE_FORMAT = "json"
     ARRANGE_MODIFIED_WITH_IMAGE = "Q"  # Sort by modified date with image
-    LIST_YN_YES = "Y"
     DEFAULT_YN_YES = "Y"
     DEFAULT_YN_NO = "N"
     FIRST_IMAGE_YN_YES = "Y"
@@ -155,18 +154,18 @@ class KoreaTourismApiClient:
     # --- End Constants ---
 
     # Common endpoints (will be prefixed with service name)
-    AREA_BASED_LIST_ENDPOINT = "/areaBasedList1"
-    LOCATION_BASED_LIST_ENDPOINT = "/locationBasedList1"
-    SEARCH_KEYWORD_ENDPOINT = "/searchKeyword1"
-    SEARCH_FESTIVAL_ENDPOINT = "/searchFestival1"
-    SEARCH_STAY_ENDPOINT = "/searchStay1"
-    DETAIL_COMMON_ENDPOINT = "/detailCommon1"
-    DETAIL_INTRO_ENDPOINT = "/detailIntro1"
-    DETAIL_INFO_ENDPOINT = "/detailInfo1"
-    DETAIL_IMAGE_ENDPOINT = "/detailImage1"
-    AREA_BASED_SYNC_LIST_ENDPOINT = "/areaBasedSyncList1"
-    AREA_CODE_LIST_ENDPOINT = "/areaCode1"
-    CATEGORY_CODE_LIST_ENDPOINT = "/categoryCode1"
+    AREA_BASED_LIST_ENDPOINT = "/areaBasedList2"
+    LOCATION_BASED_LIST_ENDPOINT = "/locationBasedList2"
+    SEARCH_KEYWORD_ENDPOINT = "/searchKeyword2"
+    SEARCH_FESTIVAL_ENDPOINT = "/searchFestival2"
+    SEARCH_STAY_ENDPOINT = "/searchStay2"
+    DETAIL_COMMON_ENDPOINT = "/detailCommon2"
+    DETAIL_INTRO_ENDPOINT = "/detailIntro2"
+    DETAIL_INFO_ENDPOINT = "/detailInfo2"
+    DETAIL_IMAGE_ENDPOINT = "/detailImage2"
+    AREA_BASED_SYNC_LIST_ENDPOINT = "/areaBasedSyncList2" 
+    AREA_CODE_LIST_ENDPOINT = "/areaCode2"
+    CATEGORY_CODE_LIST_ENDPOINT = "/categoryCode2"
 
     # Class-level connection pool and semaphore for concurrency control
     _shared_client: ClassVar[Optional[httpx.AsyncClient]] = None
@@ -533,7 +532,6 @@ class KoreaTourismApiClient:
         params: Dict[str, Any] = {
             "keyword": keyword,
             "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,
-            "listYN": self.LIST_YN_YES,
             "pageNo": str(page),
             "numOfRows": str(rows),
         }
@@ -620,7 +618,6 @@ class KoreaTourismApiClient:
         """
         params: Dict[str, Any] = {
             "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,
-            "listYN": self.LIST_YN_YES,
             "pageNo": str(page),
             "numOfRows": str(rows),
             # "_type": self.RESPONSE_FORMAT, # Added in _make_request
@@ -718,7 +715,6 @@ class KoreaTourismApiClient:
             raise ValueError("radius must be a valid integer")
 
         params: Dict[str, Any] = {
-            "listYN": self.LIST_YN_YES,
             "pageNo": str(page),
             "numOfRows": str(rows),
             "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,
@@ -809,7 +805,6 @@ class KoreaTourismApiClient:
             "pageNo": str(page),
             "numOfRows": str(rows),
             "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,  # Default arrange added
-            "listYN": self.LIST_YN_YES,  # Default listYN added
         }
 
         if event_end_date:
@@ -881,7 +876,6 @@ class KoreaTourismApiClient:
             "pageNo": str(page),
             "numOfRows": str(rows),
             "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,  # Default arrange added
-            "listYN": self.LIST_YN_YES,  # Default listYN added
         }
 
         if area_code:
@@ -1248,7 +1242,6 @@ class KoreaTourismApiClient:
         params: Dict[str, Any] = {
             "numOfRows": str(rows),  # Use str()
             "pageNo": str(page),  # Use str()
-            "listYN": self.LIST_YN_YES,
             "arrange": self.ARRANGE_MODIFIED_WITH_IMAGE,
         }
         if show_flag:
