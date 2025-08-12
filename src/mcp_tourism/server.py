@@ -856,9 +856,6 @@ async def get_detailed_information(
         content_id=content_id,
         content_type_id=content_type_id,
         language=language,
-        overview_yn="Y",
-        first_image_yn="Y",
-        mapinfo_yn="Y",
     )
 
     # Get intro details if content_type_id is provided

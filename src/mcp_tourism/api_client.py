@@ -945,8 +945,6 @@ class KoreaTourismApiClient:
         self,
         content_id: str,
         language: Optional[str] = None,
-        image_yn: Literal["Y", "N"] = "Y",
-        sub_image_yn: Literal["Y", "N"] = "Y",
         rows: int = 20,
         page: int = 1,
     ) -> Dict[str, Any]:
@@ -956,8 +954,6 @@ class KoreaTourismApiClient:
         Args:
             content_id: Content ID from the tourism API
             language: Override the client's default language
-            image_yn: Y=Content image inquiry N="Restaurant" type food menu image
-            sub_image_yn: Y=Inquiry of original,thumbnail image,public Nuri copyright type information N=Null
             rows: Number of items per page
             page: Page number for pagination
 
@@ -985,8 +981,6 @@ class KoreaTourismApiClient:
 
         params: Dict[str, Any] = {
             "contentId": content_id,
-            "imageYN": image_yn,
-            "subImageYN": sub_image_yn,
             "numOfRows": str(rows),
             "pageNo": str(page),
         }
