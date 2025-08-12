@@ -131,26 +131,6 @@ class KoreaTourismApiClient:
     MOBILE_APP = "MobileApp"
     RESPONSE_FORMAT = "json"
     ARRANGE_MODIFIED_WITH_IMAGE = "Q"  # Sort by modified date with image
-    DEFAULT_YN_YES = "Y"
-    DEFAULT_YN_NO = "N"
-    FIRST_IMAGE_YN_YES = "Y"
-    FIRST_IMAGE_YN_NO = "N"
-    AREACODE_YN_YES = "Y"
-    AREACODE_YN_NO = "N"
-    CATCODE_YN_YES = "Y"
-    CATCODE_YN_NO = "N"
-    ADDRINFO_YN_YES = "Y"
-    ADDRINFO_YN_NO = "N"
-    MAPINFO_YN_YES = "Y"
-    MAPINFO_YN_NO = "N"
-    OVERVIEW_YN_YES = "Y"
-    OVERVIEW_YN_NO = "N"
-    TRANS_GUIDE_YN_YES = "Y"
-    TRANS_GUIDE_YN_NO = "N"
-    IMAGE_YN_YES = "Y"
-    IMAGE_YN_NO = "N"
-    SUB_IMAGE_YN_YES = "Y"
-    SUB_IMAGE_YN_NO = "N"
     # --- End Constants ---
 
     # Common endpoints (will be prefixed with service name)
@@ -894,14 +874,6 @@ class KoreaTourismApiClient:
         content_id: str,
         content_type_id: Optional[str] = None,
         language: Optional[str] = None,
-        default_yn: Literal["Y", "N"] = "Y",
-        first_image_yn: Literal["Y", "N"] = "Y",
-        areacode_yn: Literal["Y", "N"] = "Y",
-        catcode_yn: Literal["Y", "N"] = "Y",
-        addrinfo_yn: Literal["Y", "N"] = "Y",
-        mapinfo_yn: Literal["Y", "N"] = "Y",
-        overview_yn: Literal["Y", "N"] = "Y",
-        trans_guide_yn: Literal["Y", "N"] = "Y",
         rows: int = 20,
         page: int = 1,
     ) -> Dict[str, Any]:
@@ -915,14 +887,6 @@ class KoreaTourismApiClient:
             content_id: Content ID from the tourism API
             content_type_id: Content type ID from the tourism API
             language: Override the client's default language
-            default_yn: Whether to include default information
-            first_image_yn: Whether to include first image
-            areacode_yn: Whether to include area code
-            catcode_yn: Whether to include category codes
-            addrinfo_yn: Whether to include address info
-            mapinfo_yn: Whether to include map info
-            overview_yn: Whether to include overview
-            trans_guide_yn: Whether to include road guidance information
             rows: Number of items per page
             page: Page number for pagination
 
@@ -965,14 +929,6 @@ class KoreaTourismApiClient:
 
         params: Dict[str, Any] = {
             "contentId": content_id,
-            "defaultYN": default_yn,
-            "firstImageYN": first_image_yn,
-            "areacodeYN": areacode_yn,
-            "catcodeYN": catcode_yn,
-            "addrinfoYN": addrinfo_yn,
-            "mapinfoYN": mapinfo_yn,
-            "overviewYN": overview_yn,
-            "transGuideYN": trans_guide_yn,
             "pageNo": str(page),
             "numOfRows": str(rows),
         }
